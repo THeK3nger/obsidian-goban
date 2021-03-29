@@ -1,0 +1,10 @@
+{
+  "id": "obsidian-goban",
+  "version": "0.1.0",
+  "name": "Goban Viewer",
+  "description": "Render Go/Baduk positions diagrams in note preview.",
+  "author": "Davide Aversa",
+  "authorUrl": "https://www.davideaversa.it",
+  "minAppVersion": "0.9.12",
+  "isDesktopOnly": false
+}

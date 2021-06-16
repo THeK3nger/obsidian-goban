@@ -356,25 +356,38 @@ export class GoDiagram {
 
     // poor man text wrapping, still unsupported in SVG 1.1
     //        var splitMessage = this.failureErrorMessage.match(/(.{1,15})/g);
-    var splitMessage = this.failureErrorMessage.split(/(.{1,15})/g);
-    var wPerL = 4; //words per line
-    var lines = Math.floor(splitMessage.length / wPerL);
+    const xmlns = "http://www.w3.org/2000/svg";
+
+    let splitMessage = this.failureErrorMessage.split(/(.{1,15})/g);
+    let wPerL = 4; //words per line
+    let lines = Math.floor(splitMessage.length / wPerL);
     if (splitMessage.length % wPerL !== 0) {
       lines++;
     }
-    var svgError = "";
-    svgError += "<g> \n ";
-    svgError += '<rect x="0" y="0" rx="20" ry="20" width="300" ';
-    svgError += 'height="' + (lines * 50).toString() + '" ';
-    svgError += ' fill="red" stroke="black"';
-    svgError += 'class="' + errorClass + '" > </rect>\n';
-    svgError += '<text x="30" y="30" font-size="15" fill="black">\n';
-    for (var i = 0; i < lines; i++) {
-      svgError += splitMessage.slice(i * wPerL, (i + 1) * wPerL) + "\n";
+    const svgError = document.createElementNS(xmlns, "g");
+    const rect = document.createElementNS(xmlns, "rect");
+    rect.setAttributeNS(null, "x", "0");
+    rect.setAttributeNS(null, "y", "0");
+    rect.setAttributeNS(null, "rx", "20");
+    rect.setAttributeNS(null, "ry", "20");
+    rect.setAttributeNS(null, "height", String(lines*50));
+    rect.setAttributeNS(null, "fill", "red");
+    rect.setAttributeNS(null, "stroke", "black");
+    rect.setAttributeNS(null, "class", "errorClass");
+    const text = document.createElementNS(xmlns, "text");
+    text.setAttributeNS(null, "x", "30");
+    text.setAttributeNS(null, "y", "30");
+    text.setAttributeNS(null, "font-size", "15");
+    text.setAttributeNS(null, "fill", "black");
+
+    let message = ""
+    for (let i = 0; i < lines; i++) {
+      message += splitMessage.slice(i * wPerL, (i + 1) * wPerL) + "\n";
     }
-    svgError += "</text>\n";
-    svgError += "</g>\n";
-    return svgError;
+    text.innerHTML = message;
+    svgError.appendChild(rect)
+    svgError.appendChild(text)
+    return String(svgError); // TODO: Just to allow compilation.
   }
 
   createSVG() 

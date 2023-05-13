@@ -364,16 +364,18 @@ export class GoDiagram {
     return svgError;
   }
 
-  createSVG() /** Create the SVG image based on ASCII diagram
-   *   returns an SVG object (an XML text file)
-   **/ {
+  createSVG() 
+   /** Create the SVG image based on ASCII diagram
+    *  returns an SVG object (an XML text file), and the svg's width and height.
+    **/
+  : {xml: string, width: number | null, height: number | null} {
     // parse input diagram, create error SVG if failed
     let errorClass = "";
 
     if (this.diagram === null) {
       //parsing failed
       this.failureErrorMessage = "Parsing of ASCII diagram failed";
-      return this.createSvgErrorMessage(errorClass);
+      return { xml: this.createSvgErrorMessage(errorClass), width: null, height: null};
     } else {
       // parsing succeeded --> create SVG diagram
       var imgSvg: Record<string, string> = {};
@@ -644,7 +646,7 @@ export class GoDiagram {
         imgSvg["coordinates"] +
         imgSvg["closeSvgTag"];
 
-      return svgElement;
+      return {xml: svgElement, width: this.imageWidth, height: this.imageHeight};
     }
   }
 

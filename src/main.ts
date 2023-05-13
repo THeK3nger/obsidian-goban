@@ -26,8 +26,8 @@ export default class ObsidianGoban extends Plugin {
       //const svgGobanDOM = parser.parseFromString(svgGoban, "image/svg+xml");
 
       const xmlns = "http://www.w3.org/2000/svg";
-      var boxWidth = 320;
-      var boxHeight = 320;
+      var boxWidth = svgGoban.width ?? 320;
+      var boxHeight = svgGoban.height ?? 320;
       var block = document.createElementNS(xmlns, "svg");
       block.setAttributeNS(
         null,
@@ -36,7 +36,7 @@ export default class ObsidianGoban extends Plugin {
       );
       block.setAttributeNS(null, "width", String(boxWidth));
       block.setAttributeNS(null, "height", String(boxHeight));
-      block.innerHTML = svgGoban;
+      block.innerHTML = svgGoban.xml;
       block.style.display = "block";
       el.appendChild(block);
     };

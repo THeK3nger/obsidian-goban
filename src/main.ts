@@ -34,11 +34,15 @@ export default class ObsidianGoban extends Plugin {
         "viewBox",
         "0 0 " + boxWidth + " " + boxHeight
       );
-      block.setAttributeNS(null, "width", String(boxWidth));
-      block.setAttributeNS(null, "height", String(boxHeight));
+      block.setAttributeNS(null, "width", String(this.roundNumberToTens(boxWidth)));
+      block.setAttributeNS(null, "height", String(this.roundNumberToTens(boxHeight)));
       block.innerHTML = svgGoban.xml;
       block.style.display = "block";
       el.appendChild(block);
     };
+  }
+
+  private roundNumberToTens(num : number) : number {
+    return Math.ceil(num / 10) * 10;
   }
 }

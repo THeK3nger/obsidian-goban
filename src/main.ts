@@ -26,19 +26,23 @@ export default class ObsidianGoban extends Plugin {
       //const svgGobanDOM = parser.parseFromString(svgGoban, "image/svg+xml");
 
       const xmlns = "http://www.w3.org/2000/svg";
-      var boxWidth = 320;
-      var boxHeight = 320;
+      var boxWidth = svgGoban.width ?? 320;
+      var boxHeight = svgGoban.height ?? 320;
       var block = document.createElementNS(xmlns, "svg");
       block.setAttributeNS(
         null,
         "viewBox",
         "0 0 " + boxWidth + " " + boxHeight
       );
-      block.setAttributeNS(null, "width", String(boxWidth));
-      block.setAttributeNS(null, "height", String(boxHeight));
-      block.innerHTML = svgGoban;
+      block.setAttributeNS(null, "width", String(this.roundNumberToTens(boxWidth)));
+      block.setAttributeNS(null, "height", String(this.roundNumberToTens(boxHeight)));
+      block.innerHTML = svgGoban.xml;
       block.style.display = "block";
       el.appendChild(block);
     };
+  }
+
+  private roundNumberToTens(num : number) : number {
+    return Math.ceil(num / 10) * 10;
   }
 }

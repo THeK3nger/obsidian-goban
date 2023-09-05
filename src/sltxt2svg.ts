@@ -52,7 +52,10 @@
  *   O         plain white stone
  * 1..9        Black's move 1, White's move 2
  * 0 (zero)    Black's or White's move 10
- *   -         Black's or White's move 11-100
+ * 10+         Black's or White's moves from 10 to infinity can be added by using a 
+ *                multi-digit number.  However, any row that includes such a number
+ *                cannot be written in compact notation (row must include spaces 
+ *                between intersections).
  *   B         black stone with circle
  *   W         white stone with circle
  *   #         black stone with square
@@ -195,11 +198,21 @@ export class GoDiagram {
       var diag;
       // remove unnecessary chars, replace border chars
       diag = this.diagram.replace(/[-|+]/g, "%");
-      diag = diag.replace(/[ \t\r\$]/g, "");
+      diag = diag.replace(/[\t\r\$]/g, "");
       diag = diag.replace(/\n+/g, " \n");
       // trim(preg_replace("/\n+/", " \n", $diag));
-      this.rows = diag.split("\n");
-
+      
+      this.rows = [];
+      var tempRows = diag.split("\n");
+      for (var i = 0; i < tempRows.length; i++) {
+        // Check if the row appears to be in non-compact form (spaces), 
+        // includes a number (/\d/.test), and is not a line/arrow definition line ({)
+        if (tempRows[i].contains(' ') && /\d/.test(tempRows[i]) && !tempRows[i].contains('{'))
+          this.rows.push(tempRows[i].split(' '));
+        else
+          this.rows.push(tempRows[i].replaceAll(' ', ''));
+      }
+      
       // find borders
       this.startrow = 0;
       this.startcol = 0;
@@ -613,7 +626,7 @@ export class GoDiagram {
                 break;
               }
               var xOffset =
-                parseInt(curchar) == 2
+                parseInt(curchar) >= 10
                   ? this.fontSize["w"]
                   : this.fontSize["w"] / 2;
               var yOffset = this.fontSize["h"] / 2 - 12.5;

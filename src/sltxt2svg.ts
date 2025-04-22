@@ -52,9 +52,9 @@
  *   O         plain white stone
  * 1..9        Black's move 1, White's move 2
  * 0 (zero)    Black's or White's move 10
- * 10+         Black's or White's moves from 10 to infinity can be added by using a 
+ * 10+         Black's or White's moves from 10 to infinity can be added by using a
  *                multi-digit number.  However, any row that includes such a number
- *                cannot be written in compact notation (row must include spaces 
+ *                cannot be written in compact notation (row must include spaces
  *                between intersections).
  *   B         black stone with circle
  *   W         white stone with circle
@@ -201,18 +201,21 @@ export class GoDiagram {
       diag = diag.replace(/[\t\r\$]/g, "");
       diag = diag.replace(/\n+/g, " \n");
       // trim(preg_replace("/\n+/", " \n", $diag));
-      
+
       this.rows = [];
       var tempRows = diag.split("\n");
       for (var i = 0; i < tempRows.length; i++) {
-        // Check if the row appears to be in non-compact form (spaces), 
+        // Check if the row appears to be in non-compact form (spaces),
         // includes a number (/\d/.test), and is not a line/arrow definition line ({)
-        if (tempRows[i].contains(' ') && /\d/.test(tempRows[i]) && !tempRows[i].contains('{'))
-          this.rows.push(tempRows[i].split(' '));
-        else
-          this.rows.push(tempRows[i].replaceAll(' ', ''));
+        if (
+          tempRows[i].includes(" ") &&
+          /\d/.test(tempRows[i]) &&
+          !tempRows[i].includes("{")
+        )
+          this.rows.push(tempRows[i].split(" "));
+        else this.rows.push(tempRows[i].replaceAll(" ", ""));
       }
-      
+
       // find borders
       this.startrow = 0;
       this.startcol = 0;
@@ -370,7 +373,7 @@ export class GoDiagram {
     rect.setAttributeNS(null, "y", "0");
     rect.setAttributeNS(null, "rx", "20");
     rect.setAttributeNS(null, "ry", "20");
-    rect.setAttributeNS(null, "height", String(lines*50));
+    rect.setAttributeNS(null, "height", String(lines * 50));
     rect.setAttributeNS(null, "fill", "red");
     rect.setAttributeNS(null, "stroke", "black");
     rect.setAttributeNS(null, "class", "errorClass");
@@ -380,28 +383,31 @@ export class GoDiagram {
     text.setAttributeNS(null, "font-size", "15");
     text.setAttributeNS(null, "fill", "black");
 
-    let message = ""
+    let message = "";
     for (let i = 0; i < lines; i++) {
       message += splitMessage.slice(i * wPerL, (i + 1) * wPerL) + "\n";
     }
     text.innerHTML = message;
-    svgError.appendChild(rect)
-    svgError.appendChild(text)
+    svgError.appendChild(rect);
+    svgError.appendChild(text);
     return String(svgError); // TODO: Just to allow compilation.
   }
 
-  createSVG() 
-   /** Create the SVG image based on ASCII diagram
-    *  returns an SVG object (an XML text file), and the svg's width and height.
-    **/
-  : {xml: string, width: number | null, height: number | null} {
+  /** Create the SVG image based on ASCII diagram
+   *  returns an SVG object (an XML text file), and the svg's width and height.
+   **/
+  createSVG(): { xml: string; width: number | null; height: number | null } {
     // parse input diagram, create error SVG if failed
     let errorClass = "";
 
     if (this.diagram === null) {
       //parsing failed
       this.failureErrorMessage = "Parsing of ASCII diagram failed";
-      return { xml: this.createSvgErrorMessage(errorClass), width: null, height: null};
+      return {
+        xml: this.createSvgErrorMessage(errorClass),
+        width: null,
+        height: null,
+      };
     } else {
       // parsing succeeded --> create SVG diagram
       var imgSvg: Record<string, string> = {};
@@ -422,7 +428,7 @@ export class GoDiagram {
       var gobanborder = "rgb(150, 110, 65)";
       var gobanborder2 = "rgb(210, 145, 80)";
       var gobanopen = "rgb(255, 210, 140)";
-      var link = "rgb(202, 106, 69)";
+      var link = "rgb(230, 238, 75)";
       var markupColor = "";
       var linkOpacity = 0.4; // Transparency of the linked areas on the goban
 
@@ -445,7 +451,7 @@ export class GoDiagram {
       // coordinates and auxiliary text. About 90% of the standard font for markup
       var svgMarkupTextSize =
         'style="font-size:' +
-        Math.floor(this.fontSize["h"] * 0.9).toString() +
+        Math.floor(this.fontSize["h"] * 0.9 - 1).toString() +
         'px"';
       var svgDefaultTextSize =
         'style="font-size:' + (this.fontSize["h"] / 2).toString() + 'px"';
@@ -672,7 +678,11 @@ export class GoDiagram {
         imgSvg["coordinates"] +
         imgSvg["closeSvgTag"];
 
-      return {xml: svgElement, width: this.imageWidth, height: this.imageHeight};
+      return {
+        xml: svgElement,
+        width: this.imageWidth,
+        height: this.imageHeight,
+      };
     }
   }
 
@@ -687,7 +697,7 @@ export class GoDiagram {
      **/
   ) {
     return `<circle cx="${String(x)}" cy = "${String(y)}" r = "${String(
-      this.radius
+      this.radius - 1 // - 1 pixel for the border
     )}" stroke = "${String(colorRing)}" fill = "${String(colorInside)}" />
   `;
   }

@@ -524,28 +524,17 @@ export class GoDiagram {
            *   instead of the xlink namespace.
            *   See https://www.w3.org/TR/SVG2/linking.html#URLReference
            */
-          if (
-            typeof this.linkmap[curchar] !== "undefined" &&
-            this.linkmap[curchar] !== null
-          ) {
-            imgSvg["links"] += '<a href="' + this.linkmap[curchar] + '" >\n';
-            imgSvg["links"] +=
-              '<rect x="' +
-              (elementX - this.radius) +
-              '" y="' +
-              (elementY - this.radius) +
-              '" width="' +
-              this.radius * 2 +
-              '" height="' +
-              this.radius * 2 +
-              '" stroke="' +
-              goban +
-              '" fill="' +
-              link +
-              '" fill-opacity="' +
-              linkOpacity +
-              '" />\n';
-            imgSvg["links"] += "</a>\n";
+          const linkUrl = this.linkmap[curchar];
+          if (linkUrl) {
+            imgSvg["links"] += `
+              <a href="${linkUrl}">
+                <rect x="${elementX - this.radius}" y="${
+              elementY - this.radius
+            }" 
+                      width="${this.radius * 2}" height="${this.radius * 2}" 
+                      stroke="${goban}" fill="${link}" fill-opacity="${linkOpacity}" />
+              </a>
+            `;
           }
           // {
           //    list($x, $y, $xx, $yy) = $this->_getLinkArea($xpos, $ypos);
@@ -649,20 +638,14 @@ export class GoDiagram {
                   ? this.fontSize["w"]
                   : this.fontSize["w"] / 2;
               var yOffset = this.fontSize["h"] / 2 - 12.5;
-              svgItem +=
-                '<text x="' +
-                (elementX - xOffset).toString() +
-                '" y="' +
-                (elementY - yOffset).toString() +
-                '" fill="' +
-                markupColor +
-                '" class="' +
-                markupClass +
-                '" ' +
-                svgMarkupTextSize +
-                ">" +
-                curchar +
-                "</text>\n";
+              svgItem += `
+                <text x="${elementX - xOffset}" 
+                      y="${elementY - yOffset}" 
+                      fill="${markupColor}" 
+                      class="${markupClass}" 
+                      ${svgMarkupTextSize}>
+                  ${curchar}
+                </text>\n`;
               break;
           } // end of switch curchar
           imgSvg["svgDiagram"] += svgItem;
@@ -720,27 +703,12 @@ export class GoDiagram {
       case "B":
       case "C":
         intersectionElements +=
-          '<circle cx="' +
-          x +
-          '" cy = "' +
-          y +
-          '" r = "' +
-          (radius - 3) +
-          '" stroke = "' +
-          color +
-          '" fill = "none"' +
-          '" />\n';
-        intersectionElements +=
-          '<circle cx="' +
-          x +
-          '" cy = "' +
-          y +
-          '" r = "' +
-          (radius - 2) +
-          '" stroke = "' +
-          color +
-          '" fill = "none"' +
-          '" />\n';
+          `<circle cx="${x}" cy="${y}" r="${
+            radius - 3
+          }" stroke="${color}" fill="none" />\n` +
+          `<circle cx="${x}" cy="${y}" r="${
+            radius - 2
+          }" stroke="${color}" fill="none" />\n`;
         // intersectionElements += '<circle cx="' +
         // x + '" cy = "'  +
         // y + '" r = "'  +
@@ -754,34 +722,20 @@ export class GoDiagram {
       case "S":
       case "@":
       case "#":
-        intersectionElements +=
-          '<rect x="' +
-          (x - radius / 2 + 1) +
-          '" y = "' +
-          (y - radius / 2 + 1) +
-          '" width = "' +
-          7 +
-          '" height = "' +
-          7 +
-          '" stroke = "' +
-          color +
-          '" fill = "none"' +
-          '" />\n';
+        intersectionElements += `
+          <rect x="${x - radius / 2 + 1}" 
+            y="${y - radius / 2 + 1}" 
+            width="7" 
+            height="7" 
+            stroke="${color}" 
+            fill="none" />
+        `;
         break;
 
       case ",":
-        intersectionElements +=
-          '<circle cx="' +
-          x +
-          '" cy = "' +
-          y +
-          '" r = "' +
-          3 +
-          '" stroke = "' +
-          color +
-          '" fill = "' +
-          color +
-          '" />\n';
+        intersectionElements += `
+          <circle cx="${x}" cy="${y}" r="3" stroke="${color}" fill="${color}" />
+        `;
     }
     return intersectionElements;
   }
@@ -917,20 +871,14 @@ export class GoDiagram {
       12 + this.fontSize["h"] + 2 + this.radius - this.fontSize["h"] / 2;
     for (var y = 0; y <= this.endrow - this.startrow - 1; y++) {
       var Xoffset = coordY >= 10 ? this.fontSize["w"] : this.fontSize["w"] / 2;
-      svgElem =
-        '<text x="' +
-        (leftX - Xoffset) +
-        '" y="' +
-        img_y +
-        '" class="' +
-        coordClass +
-        '" ' +
-        SVGTextSize +
-        '" color="' +
-        color +
-        '">' +
-        coordY.toString() +
-        " </text>\n";
+      svgElem = `
+      <text x="${leftX - Xoffset}" 
+          y="${img_y}" 
+          class="${coordClass}" 
+          ${SVGTextSize} 
+          color="${color}">
+        ${coordY.toString()}
+      </text>\n`;
       img_y += this.radius * 2 + 0.5;
       coordY--;
       leftColSvgElems += svgElem;
@@ -940,20 +888,14 @@ export class GoDiagram {
     var img_x =
       2 + this.fontSize["w"] * 2 + 4 + this.radius - this.fontSize["w"] / 2;
     for (var x = 0; x <= this.endcol - this.startcol; x++) {
-      svgElem =
-        '<text x="' +
-        img_x +
-        '" y="' +
-        topY +
-        '" class="' +
-        coordClass +
-        '" ' +
-        SVGTextSize +
-        ' color="' +
-        color +
-        '">' +
-        coordChars[coordX] +
-        " </text>\n";
+      svgElem = `
+    <text x="${img_x}" 
+        y="${topY}" 
+        class="${coordClass}" 
+        ${SVGTextSize} 
+        color="${color}">
+      ${coordChars[coordX]}
+    </text>\n`;
       img_x += this.radius * 2;
       coordX++;
       topRowSvgElems += svgElem;

@@ -4,23 +4,26 @@
   "version": "0.1.0",
   "description": "Rendering engine for Go/Baduk positions in Obsidian",
   "main": "main.js",
+  "type": "module",
   "scripts": {
     "dev": "rollup --config rollup.config.js -w",
-    "build": "rollup --config rollup.config.js"
+    "build": "tsc --noEmit -skipLibCheck && rollup --config rollup.config.js",
+    "version": "node version-bump.mjs && git add manifest.json versions.json"
   },
   "keywords": [
     "obsidian-md"
   ],
   "license": "MIT",
   "devDependencies": {
-    "@rollup/plugin-commonjs": "^17.1.0",
-    "@rollup/plugin-legacy": "^2.1.0",
-    "@rollup/plugin-node-resolve": "^11.1.1",
-    "@rollup/plugin-typescript": "^8.1.1",
-    "@types/node": "^14.14.25",
-    "obsidian": "https://github.com/obsidianmd/obsidian-api/tarball/master",
-    "rollup": "^2.38.5",
-    "tslib": "^2.1.0",
-    "typescript": "^4.1.3"
+    "@rollup/plugin-commonjs": "^26.0.0",
+    "@rollup/plugin-node-resolve": "^15.2.0",
+    "@rollup/plugin-typescript": "^12.0.0",
+    "@types/node": "^16.11.6",
+    "@typescript-eslint/eslint-plugin": "^5.29.0",
+    "@typescript-eslint/parser": "^5.29.0",
+    "obsidian": "latest",
+    "rollup": "^4.21.0",
+    "tslib": "^2.4.0",
+    "typescript": "^4.7.4"
   }
 }

@@ -2,8 +2,6 @@ import { MarkdownPostProcessorContext, Plugin } from "obsidian";
 import { GoDiagram } from "./sltxt2svg";
 
 export default class ObsidianGoban extends Plugin {
-  onInit() {}
-
   async onload() {
     console.log("Loading Obsidian Goban");
     this.registerMarkdownCodeBlockProcessor("goban", this.draw_chessboard());

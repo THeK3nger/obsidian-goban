@@ -4,20 +4,24 @@
       "inlineSourceMap": true,
       "inlineSources": true,
       "module": "ESNext",
-      "target": "es5",
+      "target": "ES6",
       "allowJs": true,
       "noImplicitAny": true,
       "moduleResolution": "node",
       "importHelpers": true,
-      "allowSyntheticDefaultImports": true,
+      "isolatedModules": true,
+      "strictNullChecks": true,
       "lib": [
-        "dom",
-        "es5",
-        "scripthost",
-        "es2018"
+        "DOM",
+        "ES5",
+        "ES6",
+        "ES7"
       ]
     },
     "include": [
-      "**/*.ts"
+      "src/**/*.ts"
+    ],
+    "exclude": [
+      "node_modules"
     ]
   }

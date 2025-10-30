@@ -12,8 +12,13 @@ export default {
   },
   external: ["obsidian"],
   plugins: [
-    typescript({ allowSyntheticDefaultImports: true }),
+    typescript({
+      tsconfig: "./tsconfig.json",
+      compilerOptions: {
+        outDir: "."
+      }
+    }),
     nodeResolve({ browser: true }),
-    commonjs({ include: "node_modules/**" }),
+    commonjs(),
   ],
 };

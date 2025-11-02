@@ -80,8 +80,17 @@
  * The GoDiagram class
  * All you need to know are the following methods and variables:
  *
- * - create image with new GoDiagram(string) where string contains
+ * - create image with new GoDiagram(string, options) where string contains
  *   the diagram in Sensei Library's diagram format.
+ *
+ *   Options (all optional):
+ *   - width: target width in pixels (default: 400)
+ *   - fontSize: custom font size { h: number, w: number } (will be auto-calculated from width if not provided)
+ *
+ *   Examples:
+ *   - new GoDiagram(diagramString) // Uses default 400px width
+ *   - new GoDiagram(diagramString, { width: 600 }) // Custom width
+ *   - new GoDiagram(diagramString, { fontSize: { h: 20, w: 10 } }) // Custom fontSize
  *
  * - to parse the ASCII diagram and get the SVG image call diagram.createSVG()
  *   If parsing has failed, an SVG image with an error message will be returned.
@@ -123,6 +132,8 @@ const CIRCLE_INNER_RADIUS_OFFSET = 3;
 const CIRCLE_OUTER_RADIUS_OFFSET = 2;
 const SQUARE_HALF_SIZE = 7;
 const HOSHI_RADIUS = 3;
+const DEFAULT_DIAGRAM_WIDTH = 400;
+const DEFAULT_FONT_SIZE: FontSize = { h: 16, w: 8 };
 
 type FontSize = { h: number; w: number };
 type SVGResult = { xml: string; width: number | null; height: number | null };
@@ -132,6 +143,7 @@ export class GoDiagram {
   inputDiagram: string;
   diagram: string | null;
   failureErrorMessage: string;
+  targetWidth: number | null;
 
   // Auxiliary global variables.
   private content: string[];
@@ -157,16 +169,23 @@ export class GoDiagram {
 
   constructor(
     input_diagram: string,
-    fontSize: FontSize = { h: 16, w: 8 }
+    options: {
+      fontSize?: FontSize;
+      width?: number;
+    } = {}
     /**
      * Constructor of class GoDiagram
      * input_diagram is the diagram in SL's diagram format
      *
-     * fontSize are the height and width in pixels of a box for
-     * HTML latin2 standard fontsize 4.
+     * options.fontSize are the height and width in pixels of a box for
+     * HTML latin2 standard fontsize 4. (optional, will be calculated from width if not provided)
+     * options.width is the target width in pixels for the diagram (default: 400px)
      **/
   ) {
-    this.fontSize = fontSize;
+    this.targetWidth = options.width ?? DEFAULT_DIAGRAM_WIDTH;
+    // Only use default fontSize if fontSize is explicitly provided
+    // Otherwise use placeholder to trigger auto-calculation based on width
+    this.fontSize = options.fontSize ?? { h: 0, w: 0 };
     this.inputDiagram = input_diagram;
     this.diagram = null; //default value, overwritten if parsing succeeds
     this.failureErrorMessage = "";
@@ -270,6 +289,17 @@ export class GoDiagram {
        * in an instance variable and default to h:16 and w:8 (equivalent to
        * the px heights and width of a font size 2).
        * The image's size adds room for two cells on all sides for the borders **/
+
+      // Calculate fontSize based on target width if it needs to be calculated
+      if (this.targetWidth && this.fontSize.h === 0) {
+        const numCols = 1 + this.endcol - this.startcol;
+        const targetDiameter = (this.targetWidth - IMAGE_BORDER) / numCols;
+        // Calculate fontSize from diameter (reverse of diameter = sqrt(h^2 + w^2))
+        // Using the ratio h:w = 2:1 from default fontSize
+        const h = Math.floor(targetDiameter / Math.sqrt(5)); // sqrt(2^2 + 1^2) = sqrt(5)
+        const w = Math.floor(h / 2);
+        this.fontSize = { h, w };
+      }
 
       const diameter = Math.floor(
         Math.sqrt(this.fontSize["h"] ** 2 + this.fontSize["w"] ** 2)
@@ -628,16 +658,14 @@ export class GoDiagram {
               else {
                 break;
               }
-              const xOffset =
-                parseInt(curchar) >= 10
-                  ? this.fontSize["w"]
-                  : this.fontSize["w"] * DEFAULT_TEXT_SIZE_RATIO;
-              const yOffset = this.fontSize["h"] * DEFAULT_TEXT_SIZE_RATIO - Y_OFFSET_ADJUSTMENT;
+              // Use SVG text-anchor and dominant-baseline for proper centering
               svgItem += `
-                <text x="${elementX - xOffset}" 
-                      y="${elementY - yOffset}" 
-                      fill="${markupColor}" 
-                      class="${markupClass}" 
+                <text x="${elementX}"
+                      y="${elementY}"
+                      fill="${markupColor}"
+                      class="${markupClass}"
+                      text-anchor="middle"
+                      dominant-baseline="central"
                       ${svgMarkupTextSize}>
                   ${curchar}
                 </text>\n`;
@@ -796,29 +824,32 @@ export class GoDiagram {
         : 0;
 
     // coordinate calculations according to offsets and sizes
-    // in createSVG.  See createSVG for values
+    // Align with grid intersections using the same formula as the main drawing loop
 
-    // Offset from left border. May have to be adjusted for different fontsizes
+    // Offset from left border
     const leftX = COORDINATE_LEFT_OFFSET + this.fontSize["w"];
-    let img_y = COORDINATE_BOTTOM_OFFSET + this.fontSize["h"] + IMAGE_OFFSET + this.radius - this.fontSize["h"] * DEFAULT_TEXT_SIZE_RATIO;
+    // Start at the same Y position as the first grid intersection
+    let img_y = this.radius + this.offset_y;
 
-    for (let y = 0; y <= this.endrow - this.startrow - 1; y++) {
-      const Xoffset = coordY >= 10 ? this.fontSize["w"] : this.fontSize["w"] * DEFAULT_TEXT_SIZE_RATIO;
+    for (let y = 0; y <= this.endrow - this.startrow; y++) {
       leftColSvgElems += `
-      <text x="${leftX - Xoffset}"
+      <text x="${leftX}"
           y="${img_y}"
           class="${coordClass}"
           ${SVGTextSize}
-          color="${color}">
+          color="${color}"
+          text-anchor="middle"
+          dominant-baseline="central">
         ${coordY.toString()}
       </text>\n`;
-      img_y += this.radius * 2 + 0.5;
+      img_y += this.radius * 2;
       coordY--;
     }
 
-    // Offset from top of image. May have to be adjusted for different font sizes
+    // Offset from top of image
     const topY = COORDINATE_TOP_OFFSET;
-    let img_x = IMAGE_OFFSET + this.fontSize["w"] * 2 + IMAGE_BORDER + this.radius - this.fontSize["w"] * DEFAULT_TEXT_SIZE_RATIO;
+    // Start at the same X position as the first grid intersection
+    let img_x = this.radius + this.offset_x;
 
     for (let x = 0; x <= this.endcol - this.startcol; x++) {
       topRowSvgElems += `
@@ -826,7 +857,9 @@ export class GoDiagram {
         y="${topY}"
         class="${coordClass}"
         ${SVGTextSize}
-        color="${color}">
+        color="${color}"
+        text-anchor="middle"
+        dominant-baseline="central">
       ${coordChars[coordX]}
     </text>\n`;
       img_x += this.radius * 2;

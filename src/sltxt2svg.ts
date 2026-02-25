@@ -134,9 +134,23 @@ const SQUARE_HALF_SIZE = 7;
 const HOSHI_RADIUS = 3;
 const DEFAULT_DIAGRAM_WIDTH = 400;
 const DEFAULT_FONT_SIZE: FontSize = { h: 16, w: 8 };
+const COORDINATE_WIDTH_PADDING = 4;  // extra px added to image width for coordinate labels
+const COORDINATE_HEIGHT_PADDING = 2; // extra px added to image height for coordinate labels
+const LINK_AREA_OPACITY = 0.4;        // transparency of linked areas on the goban
+const LETTER_RADIUS_OFFSET = 4;      // extra radius when drawing a background behind letters
+const ERROR_WORDS_PER_LINE = 4;      // chunks used for wrapping the error message text
 
 type FontSize = { h: number; w: number };
 type SVGResult = { xml: string; width: number | null; height: number | null };
+
+interface SVGComponents {
+  openSvgTag: string;
+  background: string;
+  coordinates: string;
+  svgDiagram: string;
+  links: string;
+  closeSvgTag: string;
+}
 
 export class GoDiagram {
   fontSize: FontSize;
@@ -302,7 +316,7 @@ export class GoDiagram {
       }
 
       const diameter = Math.floor(
-        Math.sqrt(this.fontSize["h"] ** 2 + this.fontSize["w"] ** 2)
+        Math.sqrt(this.fontSize.h ** 2 + this.fontSize.w ** 2)
       );
       this.radius = diameter / 2;
       this.imageWidth = diameter * (1 + this.endcol - this.startcol) + IMAGE_BORDER;
@@ -316,8 +330,8 @@ export class GoDiagram {
           (this.bottomborder || this.topborder) &&
           (this.leftborder || this.rightborder)
         ) {
-          const x = this.fontSize["w"] * 2 + 4;
-          const y = this.fontSize["h"] + 2;
+          const x = this.fontSize.w * 2 + COORDINATE_WIDTH_PADDING;
+          const y = this.fontSize.h + COORDINATE_HEIGHT_PADDING;
           this.imageWidth += x;
           this.offset_x += x;
           this.imageHeight += y;
@@ -370,8 +384,8 @@ export class GoDiagram {
       this.startcol > this.endcol || // 1x1
       this.endrow < 0 ||
       this.endcol < 0 ||
-      this.imageWidth < this.fontSize["w"] ||
-      this.imageHeight < this.fontSize["h"]
+      this.imageWidth < this.fontSize.w ||
+      this.imageHeight < this.fontSize.h
     ) {
       this.diagram = null;
     }
@@ -407,7 +421,7 @@ export class GoDiagram {
     const xmlns = "http://www.w3.org/2000/svg";
 
     const splitMessage = this.failureErrorMessage.split(/(.{1,15})/g);
-    const wPerL = 4; //words per line
+    const wPerL = ERROR_WORDS_PER_LINE;
     let lines = Math.floor(splitMessage.length / wPerL);
     if (splitMessage.length % wPerL !== 0) {
       lines++;
@@ -455,33 +469,26 @@ export class GoDiagram {
       };
     } else {
       // parsing succeeded --> create SVG diagram
-      const imgSvg: Record<string, string> = {};
-      // 1. Create the SVG image element
-      imgSvg["openSvgTag"] = `<svg width = "${this.imageWidth}" height = "${this.imageHeight}">\n`;
-      imgSvg["closeSvgTag"] = "</svg>\n";
+      const imgSvg: SVGComponents = {
+        openSvgTag: `<svg width = "${this.imageWidth}" height = "${this.imageHeight}">\n`,
+        closeSvgTag: "</svg>\n",
+        background: "",
+        coordinates: "",
+        svgDiagram: "",
+        links: "",
+      };
 
       // 2. Set up the default colors
       const black = "rgb(0, 0, 0)";
       const white = "rgb(255, 255, 255)";
       const red = "rgb(255, 55, 55)";
       const goban = "rgb(242, 176, 109)";
-      const gobanborder = "rgb(150, 110, 65)";
-      const gobanborder2 = "rgb(210, 145, 80)";
-      const gobanopen = "rgb(255, 210, 140)";
       const link = "rgb(230, 238, 75)";
       let markupColor = "";
-      const linkOpacity = 0.4; // Transparency of the linked areas on the goban
+      const linkOpacity = LINK_AREA_OPACITY;
 
       // 3. Setup the CSS classes for styling
-      const blackStoneClass = "blackstone";
-      const whiteStoneClass = "whitestone";
-      const gobanClass = "goban";
-      const gobanBorderClass = "gobanBorder";
-      const linkClass = "linkClass";
       const markupClass = "markup";
-      const evenColorClass = "evenColor";
-      const oddColorClass = "oddColor";
-      const textClass = "textClass";
       const coordClass = "coordClass";
       errorClass = "errorClass";
 
@@ -489,27 +496,22 @@ export class GoDiagram {
       // Text size in SVG behaves differently than in PHP's image
       // Approximately half the height of our fontSize box is desired
       // coordinates and auxiliary text. About 90% of the standard font for markup
-      const svgMarkupTextSize = `style="font-size:${Math.floor(this.fontSize["h"] * MARKUP_TEXT_SIZE_RATIO - 1)}px"`;
-      const svgDefaultTextSize = `style="font-size:${this.fontSize["h"] * DEFAULT_TEXT_SIZE_RATIO}px"`;
+      const svgMarkupTextSize = `style="font-size:${Math.floor(this.fontSize.h * MARKUP_TEXT_SIZE_RATIO - 1)}px"`;
+      const svgDefaultTextSize = `style="font-size:${this.fontSize.h * DEFAULT_TEXT_SIZE_RATIO}px"`;
 
       // 5. Create the background
-      imgSvg["background"] = `<rect  x="0" y="0" width="${this.imageWidth}" height = "${this.imageHeight}" fill = "${goban}"/>\n`;
+      imgSvg.background = `<rect  x="0" y="0" width="${this.imageWidth}" height = "${this.imageHeight}" fill = "${goban}"/>\n`;
 
       // 6. Draw the coordinates
       if (this.coordinates) {
-        imgSvg["coordinates"] = this.drawCoordinates(
+        imgSvg.coordinates = this.drawCoordinates(
           black,
           coordClass,
           svgDefaultTextSize
         );
-      } else {
-        imgSvg["coordinates"] = "";
       }
 
-      // 7. Draw Goban border
-      //this.drawGobanBorder(gobanborder, gobanborder2, gobanopen, white);
-
-      // 8. Draw stones, numbers etc. for each row and column
+      // 7. Draw stones, numbers etc. for each row and column
       const evencolor = this.firstColor == "W" ? black : white;
       const oddcolor = this.firstColor == "W" ? white : black;
 
@@ -517,7 +519,6 @@ export class GoDiagram {
        *   imgSvg['svgDiagram']  is the string collecting
        *   all the svg elements for all the cells in the diagram
        **/
-      imgSvg["svgDiagram"] = "";
       for (let ypos = this.startrow; ypos <= this.endrow; ypos++) {
         // Get the ordinate of the element to draw
         const elementY =
@@ -551,7 +552,7 @@ export class GoDiagram {
            */
           const linkUrl = this.linkmap[curchar];
           if (linkUrl) {
-            imgSvg["links"] += `
+            imgSvg.links += `
               <a href="${linkUrl}">
                 <rect x="${elementX - this.radius}" y="${
               elementY - this.radius
@@ -561,10 +562,6 @@ export class GoDiagram {
               </a>
             `;
           }
-          // {
-          //    list($x, $y, $xx, $yy) = $this->_getLinkArea($xpos, $ypos);
-          //    ImageFilledRectangle($img, $x, $y, $xx, $yy, $link);
-          // }
           switch (curchar) {
             // if X, B, or  # we have a black stone (marked or not)
             case "X":
@@ -647,7 +644,7 @@ export class GoDiagram {
                 this.markIntersection(
                   elementX,
                   elementY,
-                  this.radius + 4,
+                  this.radius + LETTER_RADIUS_OFFSET,
                   bkColor,
                   "@"
                 );
@@ -671,18 +668,18 @@ export class GoDiagram {
                 </text>\n`;
               break;
           } // end of switch curchar
-          imgSvg["svgDiagram"] += svgItem;
+          imgSvg.svgDiagram += svgItem;
         } // end of xpos loop
       } // end of ypos loop
 
       // 7. Assemble the complete  svg element and return it
       const svgElement =
-        imgSvg["openSvgTag"] +
-        imgSvg["background"] +
-        imgSvg["svgDiagram"] +
-        imgSvg["links"] +
-        imgSvg["coordinates"] +
-        imgSvg["closeSvgTag"];
+        imgSvg.openSvgTag +
+        imgSvg.background +
+        imgSvg.svgDiagram +
+        imgSvg.links +
+        imgSvg.coordinates +
+        imgSvg.closeSvgTag;
 
       return {
         xml: svgElement,
@@ -827,7 +824,7 @@ export class GoDiagram {
     // Align with grid intersections using the same formula as the main drawing loop
 
     // Offset from left border
-    const leftX = COORDINATE_LEFT_OFFSET + this.fontSize["w"];
+    const leftX = COORDINATE_LEFT_OFFSET + this.fontSize.w;
     // Start at the same Y position as the first grid intersection
     let img_y = this.radius + this.offset_y;
 
@@ -867,10 +864,6 @@ export class GoDiagram {
     }
     return leftColSvgElems + topRowSvgElems;
   }
-
-  //   drawGobanBorder(color, color2, open, white) {
-  //     return "";
-  //   }
 
   createSGF(): string /** Creates SGF based on ASCII diagram and title //FIX ME: STILL TO DO
    * returns SGF as string or FALSE (if board not a square)

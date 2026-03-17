@@ -4,29 +4,26 @@ import { GoDiagram } from "./sltxt2svg";
 export default class ObsidianGoban extends Plugin {
   async onload() {
     console.log("Loading Obsidian Goban");
-    this.registerMarkdownCodeBlockProcessor("goban", this.draw_chessboard());
+    this.registerMarkdownCodeBlockProcessor("goban", this.drawGoban());
   }
 
   refreshMarkdownCodeBlockProcessor() {
-    this.registerMarkdownCodeBlockProcessor("goban", this.draw_chessboard());
+    this.registerMarkdownCodeBlockProcessor("goban", this.drawGoban());
   }
 
-  private draw_chessboard() {
+  private drawGoban() {
     return (
       source: string,
       el: HTMLElement,
-      ctx: MarkdownPostProcessorContext
+      _ctx: MarkdownPostProcessorContext
     ) => {
       const goban = new GoDiagram(source);
       const svgGoban = goban.createSVG();
-      console.log(svgGoban);
-      //const parser = new DOMParser();
-      //const svgGobanDOM = parser.parseFromString(svgGoban, "image/svg+xml");
 
       const xmlns = "http://www.w3.org/2000/svg";
-      var boxWidth = svgGoban.width ?? 320;
-      var boxHeight = svgGoban.height ?? 320;
-      var block = document.createElementNS(xmlns, "svg");
+      const boxWidth = svgGoban.width ?? 320;
+      const boxHeight = svgGoban.height ?? 320;
+      const block = document.createElementNS(xmlns, "svg");
       block.setAttributeNS(
         null,
         "viewBox",

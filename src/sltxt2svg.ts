@@ -134,9 +134,39 @@ const SQUARE_HALF_SIZE = 7;
 const HOSHI_RADIUS = 3;
 const DEFAULT_DIAGRAM_WIDTH = 400;
 const DEFAULT_FONT_SIZE: FontSize = { h: 16, w: 8 };
+const COORDINATE_WIDTH_PADDING = 4;  // extra px added to image width for coordinate labels
+const COORDINATE_HEIGHT_PADDING = 2; // extra px added to image height for coordinate labels
+const LINK_AREA_OPACITY = 0.4;        // transparency of linked areas on the goban
+const LETTER_RADIUS_OFFSET = 4;      // extra radius when drawing a background behind letters
+const ERROR_WORDS_PER_LINE = 4;      // chunks used for wrapping the error message text
 
 type FontSize = { h: number; w: number };
 type SVGResult = { xml: string; width: number | null; height: number | null };
+
+interface SVGComponents {
+  openSvgTag: string;
+  background: string;
+  coordinates: string;
+  svgDiagram: string;
+  links: string;
+  closeSvgTag: string;
+}
+
+interface ColorPalette {
+  black: string;
+  white: string;
+  red: string;
+  goban: string;
+  link: string;
+}
+
+interface RenderContext {
+  palette: ColorPalette;
+  evencolor: string;
+  oddcolor: string;
+  markupClass: string;
+  markupTextSize: string;
+}
 
 export class GoDiagram {
   fontSize: FontSize;
@@ -302,7 +332,7 @@ export class GoDiagram {
       }
 
       const diameter = Math.floor(
-        Math.sqrt(this.fontSize["h"] ** 2 + this.fontSize["w"] ** 2)
+        Math.sqrt(this.fontSize.h ** 2 + this.fontSize.w ** 2)
       );
       this.radius = diameter / 2;
       this.imageWidth = diameter * (1 + this.endcol - this.startcol) + IMAGE_BORDER;
@@ -316,8 +346,8 @@ export class GoDiagram {
           (this.bottomborder || this.topborder) &&
           (this.leftborder || this.rightborder)
         ) {
-          const x = this.fontSize["w"] * 2 + 4;
-          const y = this.fontSize["h"] + 2;
+          const x = this.fontSize.w * 2 + COORDINATE_WIDTH_PADDING;
+          const y = this.fontSize.h + COORDINATE_HEIGHT_PADDING;
           this.imageWidth += x;
           this.offset_x += x;
           this.imageHeight += y;
@@ -370,8 +400,8 @@ export class GoDiagram {
       this.startcol > this.endcol || // 1x1
       this.endrow < 0 ||
       this.endcol < 0 ||
-      this.imageWidth < this.fontSize["w"] ||
-      this.imageHeight < this.fontSize["h"]
+      this.imageWidth < this.fontSize.w ||
+      this.imageHeight < this.fontSize.h
     ) {
       this.diagram = null;
     }
@@ -407,7 +437,7 @@ export class GoDiagram {
     const xmlns = "http://www.w3.org/2000/svg";
 
     const splitMessage = this.failureErrorMessage.split(/(.{1,15})/g);
-    const wPerL = 4; //words per line
+    const wPerL = ERROR_WORDS_PER_LINE;
     let lines = Math.floor(splitMessage.length / wPerL);
     if (splitMessage.length % wPerL !== 0) {
       lines++;
@@ -442,254 +472,185 @@ export class GoDiagram {
    *  returns an SVG object (an XML text file), and the svg's width and height.
    **/
   createSVG(): SVGResult {
-    // parse input diagram, create error SVG if failed
-    let errorClass = "";
-
     if (this.diagram === null) {
-      //parsing failed
       this.failureErrorMessage = "Parsing of ASCII diagram failed";
-      return {
-        xml: this.createSvgErrorMessage(errorClass),
-        width: null,
-        height: null,
-      };
-    } else {
-      // parsing succeeded --> create SVG diagram
-      const imgSvg: Record<string, string> = {};
-      // 1. Create the SVG image element
-      imgSvg["openSvgTag"] = `<svg width = "${this.imageWidth}" height = "${this.imageHeight}">\n`;
-      imgSvg["closeSvgTag"] = "</svg>\n";
+      return { xml: this.createSvgErrorMessage("errorClass"), width: null, height: null };
+    }
 
-      // 2. Set up the default colors
-      const black = "rgb(0, 0, 0)";
-      const white = "rgb(255, 255, 255)";
-      const red = "rgb(255, 55, 55)";
-      const goban = "rgb(242, 176, 109)";
-      const gobanborder = "rgb(150, 110, 65)";
-      const gobanborder2 = "rgb(210, 145, 80)";
-      const gobanopen = "rgb(255, 210, 140)";
-      const link = "rgb(230, 238, 75)";
-      let markupColor = "";
-      const linkOpacity = 0.4; // Transparency of the linked areas on the goban
+    const palette = this.buildColorPalette();
+    const markupTextSize = `style="font-size:${Math.floor(this.fontSize.h * MARKUP_TEXT_SIZE_RATIO - 1)}px"`;
+    const defaultTextSize = `style="font-size:${this.fontSize.h * DEFAULT_TEXT_SIZE_RATIO}px"`;
 
-      // 3. Setup the CSS classes for styling
-      const blackStoneClass = "blackstone";
-      const whiteStoneClass = "whitestone";
-      const gobanClass = "goban";
-      const gobanBorderClass = "gobanBorder";
-      const linkClass = "linkClass";
-      const markupClass = "markup";
-      const evenColorClass = "evenColor";
-      const oddColorClass = "oddColor";
-      const textClass = "textClass";
-      const coordClass = "coordClass";
-      errorClass = "errorClass";
+    const ctx: RenderContext = {
+      palette,
+      evencolor: this.firstColor === "W" ? palette.black : palette.white,
+      oddcolor:  this.firstColor === "W" ? palette.white : palette.black,
+      markupClass: "markup",
+      markupTextSize,
+    };
 
-      // plus some default styles in case CSS classes are not present
-      // Text size in SVG behaves differently than in PHP's image
-      // Approximately half the height of our fontSize box is desired
-      // coordinates and auxiliary text. About 90% of the standard font for markup
-      const svgMarkupTextSize = `style="font-size:${Math.floor(this.fontSize["h"] * MARKUP_TEXT_SIZE_RATIO - 1)}px"`;
-      const svgDefaultTextSize = `style="font-size:${this.fontSize["h"] * DEFAULT_TEXT_SIZE_RATIO}px"`;
+    const { svgDiagram, links } = this.renderGrid(ctx);
 
-      // 5. Create the background
-      imgSvg["background"] = `<rect  x="0" y="0" width="${this.imageWidth}" height = "${this.imageHeight}" fill = "${goban}"/>\n`;
+    const components: SVGComponents = {
+      openSvgTag: `<svg width="${this.imageWidth}" height="${this.imageHeight}">\n`,
+      closeSvgTag: "</svg>\n",
+      background: this.renderBackground(palette),
+      coordinates: this.coordinates
+        ? this.drawCoordinates(palette.black, "coordClass", defaultTextSize)
+        : "",
+      svgDiagram,
+      links,
+    };
 
-      // 6. Draw the coordinates
-      if (this.coordinates) {
-        imgSvg["coordinates"] = this.drawCoordinates(
-          black,
-          coordClass,
-          svgDefaultTextSize
-        );
-      } else {
-        imgSvg["coordinates"] = "";
+    return {
+      xml: this.assembleSVG(components),
+      width: this.imageWidth,
+      height: this.imageHeight,
+    };
+  }
+
+  private buildColorPalette(): ColorPalette {
+    return {
+      black: "rgb(0, 0, 0)",
+      white: "rgb(255, 255, 255)",
+      red: "rgb(255, 55, 55)",
+      goban: "rgb(242, 176, 109)",
+      link: "rgb(230, 238, 75)",
+    };
+  }
+
+  private renderBackground(palette: ColorPalette): string {
+    return `<rect x="0" y="0" width="${this.imageWidth}" height="${this.imageHeight}" fill="${palette.goban}"/>\n`;
+  }
+
+  private renderGrid(ctx: RenderContext): { svgDiagram: string; links: string } {
+    let svgDiagram = "";
+    let links = "";
+
+    for (let ypos = this.startrow; ypos <= this.endrow; ypos++) {
+      const elementY =
+        (ypos - this.startrow) * (this.radius * 2) + this.radius + this.offset_y;
+      for (let xpos = this.startcol; xpos <= this.endcol; xpos++) {
+        const elementX =
+          (xpos - this.startcol) * (this.radius * 2) + this.radius + this.offset_x;
+        const { svg, link } = this.renderCell(xpos, ypos, elementX, elementY, ctx);
+        svgDiagram += svg;
+        links += link;
+      }
+    }
+
+    return { svgDiagram, links };
+  }
+
+  private renderCell(
+    xpos: number,
+    ypos: number,
+    elementX: number,
+    elementY: number,
+    ctx: RenderContext
+  ): { svg: string; link: string } {
+    const { palette, evencolor, oddcolor, markupClass, markupTextSize } = ctx;
+    let svg = "";
+    let link = "";
+    let markupColor = "";
+    let curchar = this.rows[ypos][xpos];
+
+    // If this cell has a link, overlay a translucent highlight and wrap in <a>
+    // (SVG 2.0 href, see https://www.w3.org/TR/SVG2/linking.html#URLReference)
+    const linkUrl = this.linkmap[curchar];
+    if (linkUrl) {
+      link = `
+        <a href="${linkUrl}">
+          <rect x="${elementX - this.radius}" y="${elementY - this.radius}"
+                width="${this.radius * 2}" height="${this.radius * 2}"
+                stroke="${palette.goban}" fill="${palette.link}" fill-opacity="${LINK_AREA_OPACITY}" />
+        </a>
+      `;
+    }
+
+    switch (curchar) {
+      // Black stone — plain (X) or with circle (B) or square (#)
+      case "X":
+      case "B":
+      case "#":
+        svg += this.drawStone(elementX, elementY, palette.black, palette.black);
+        if (curchar !== "X") {
+          svg += this.markIntersection(elementX, elementY, this.radius, palette.red, curchar);
+        }
+        break;
+
+      // White stone — plain (O) or with circle (W) or square (@)
+      case "O":
+      case "W":
+      case "@":
+        svg += this.drawStone(elementX, elementY, palette.black, palette.white);
+        if (curchar !== "O") {
+          svg += this.markIntersection(elementX, elementY, this.radius, palette.red, curchar);
+        }
+        break;
+
+      // Empty intersections — dot, hoshi, circle mark, square mark
+      case ".":
+      case ",":
+      case "C":
+      case "S": {
+        const type = this.getIntersectionType(xpos, ypos);
+        svg += this.drawIntersection(elementX, elementY, palette.black, type);
+        if (curchar !== ".") {
+          const col = curchar === "," ? palette.black : palette.red;
+          svg += this.markIntersection(elementX, elementY, this.radius, col, curchar);
+        }
+        break;
       }
 
-      // 7. Draw Goban border
-      //this.drawGobanBorder(gobanborder, gobanborder2, gobanopen, white);
-
-      // 8. Draw stones, numbers etc. for each row and column
-      const evencolor = this.firstColor == "W" ? black : white;
-      const oddcolor = this.firstColor == "W" ? white : black;
-
-      /** main drawing routine starts here
-       *   imgSvg['svgDiagram']  is the string collecting
-       *   all the svg elements for all the cells in the diagram
-       **/
-      imgSvg["svgDiagram"] = "";
-      for (let ypos = this.startrow; ypos <= this.endrow; ypos++) {
-        // Get the ordinate of the element to draw
-        const elementY =
-          (ypos - this.startrow) * (this.radius * 2) +
-          this.radius +
-          this.offset_y;
-        //for each character in the row
-        for (let xpos = this.startcol; xpos <= this.endcol; xpos++) {
-          // svgItem contains one or more svg elements
-          //(circles, intersection, marks, colored areas, etc.)
-          // with the drawing code for each  cell in the diagram
-          let svgItem = "";
-          // get the absciss of the element to draw
-          const elementX =
-            (xpos - this.startcol) * (this.radius * 2) +
-            this.radius +
-            this.offset_x;
-          // Get the character
-          let curchar = this.rows[ypos][xpos];
-
-          // FIXME: TODO
-          /** Is this a linked area? if so,
-           *   add a square colored with link color
-           *   to the link elements array
-           *   and wrap the it in an "a" element with
-           *   the proper anchor and link.
-           *
-           *   We are following SVG 2.0 rules and using href
-           *   instead of the xlink namespace.
-           *   See https://www.w3.org/TR/SVG2/linking.html#URLReference
-           */
-          const linkUrl = this.linkmap[curchar];
-          if (linkUrl) {
-            imgSvg["links"] += `
-              <a href="${linkUrl}">
-                <rect x="${elementX - this.radius}" y="${
-              elementY - this.radius
-            }" 
-                      width="${this.radius * 2}" height="${this.radius * 2}" 
-                      stroke="${goban}" fill="${link}" fill-opacity="${linkOpacity}" />
-              </a>
-            `;
-          }
-          // {
-          //    list($x, $y, $xx, $yy) = $this->_getLinkArea($xpos, $ypos);
-          //    ImageFilledRectangle($img, $x, $y, $xx, $yy, $link);
-          // }
-          switch (curchar) {
-            // if X, B, or  # we have a black stone (marked or not)
-            case "X":
-            case "B":
-            case "#":
-              svgItem += this.drawStone(elementX, elementY, black, black);
-              if (curchar !== "X") {
-                svgItem += this.markIntersection(
-                  elementX,
-                  elementY,
-                  this.radius,
-                  red,
-                  curchar
-                );
-              }
-              break;
-            // if O, W, or @ we have a white stone, marked or unmarked
-            case "O":
-            case "W":
-            case "@":
-              svgItem += this.drawStone(elementX, elementY, black, white);
-              if (curchar !== "O") {
-                svgItem += this.markIntersection(
-                  elementX,
-                  elementY,
-                  this.radius,
-                  red,
-                  curchar
-                );
-              }
-              break;
-            // if . , C or S we have EMPTY intersections possibly with hoshi, circle or square
-            case ".": // empty intersection, check location
-            // (edge, corner)
-            case ",":
-            case "C":
-            case "S":
-              const type = this.getIntersectionType(xpos, ypos);
-              svgItem += this.drawIntersection(elementX, elementY, black, type);
-              if (curchar !== ".") {
-                const col = curchar == "," ? black : red;
-                svgItem += this.markIntersection(
-                  elementX,
-                  elementY,
-                  this.radius,
-                  col,
-                  curchar
-                );
-              }
-              break;
-            // any other markup (including & / ( ) ! etc.)
-            default:
-              if (parseInt(curchar) % 2 == 1) {
-                //odd numbers
-                svgItem += this.drawStone(elementX, elementY, black, oddcolor);
-                markupColor = evencolor;
-              } else if (parseInt(curchar) % 2 == 0 || parseInt(curchar) == 0) {
-                // even numbers
-                svgItem += this.drawStone(elementX, elementY, black, evencolor);
-                markupColor = oddcolor;
-                if (curchar == "0") {
-                  curchar = "10";
-                }
-              } else if (curchar >= "a" && curchar <= "z") {
-                const intersectionType = this.getIntersectionType(xpos, ypos);
-                svgItem += this.drawIntersection(
-                  elementX,
-                  elementY,
-                  black,
-                  intersectionType
-                );
-                const bkColor =
-                  typeof this.linkmap[curchar] !== "undefined" &&
-                  this.linkmap[curchar] !== null
-                    ? link
-                    : goban;
-                // Draw a stone-sized circle under the letter to hide the intersection
-                svgItem += this.drawStone(elementX, elementY, goban, goban);
-                // then draw the letter
-                this.markIntersection(
-                  elementX,
-                  elementY,
-                  this.radius + 4,
-                  bkColor,
-                  "@"
-                );
-                markupColor = black;
-                //font++   ??? Unclear what this does. font starts up set at this.fontsize, which was  2
-              }
-              // unknown character
-              else {
-                break;
-              }
-              // Use SVG text-anchor and dominant-baseline for proper centering
-              svgItem += `
-                <text x="${elementX}"
-                      y="${elementY}"
-                      fill="${markupColor}"
-                      class="${markupClass}"
-                      text-anchor="middle"
-                      dominant-baseline="central"
-                      ${svgMarkupTextSize}>
-                  ${curchar}
-                </text>\n`;
-              break;
-          } // end of switch curchar
-          imgSvg["svgDiagram"] += svgItem;
-        } // end of xpos loop
-      } // end of ypos loop
-
-      // 7. Assemble the complete  svg element and return it
-      const svgElement =
-        imgSvg["openSvgTag"] +
-        imgSvg["background"] +
-        imgSvg["svgDiagram"] +
-        imgSvg["links"] +
-        imgSvg["coordinates"] +
-        imgSvg["closeSvgTag"];
-
-      return {
-        xml: svgElement,
-        width: this.imageWidth,
-        height: this.imageHeight,
-      };
+      // Numbered moves and lettered intersections
+      default: {
+        if (parseInt(curchar) % 2 === 1) {
+          // odd-numbered move
+          svg += this.drawStone(elementX, elementY, palette.black, oddcolor);
+          markupColor = evencolor;
+        } else if (parseInt(curchar) % 2 === 0 || parseInt(curchar) === 0) {
+          // even-numbered move (0 is displayed as "10")
+          svg += this.drawStone(elementX, elementY, palette.black, evencolor);
+          markupColor = oddcolor;
+          if (curchar === "0") curchar = "10";
+        } else if (curchar >= "a" && curchar <= "z") {
+          const intersectionType = this.getIntersectionType(xpos, ypos);
+          svg += this.drawIntersection(elementX, elementY, palette.black, intersectionType);
+          const bkColor = this.linkmap[curchar] != null ? palette.link : palette.goban;
+          // Blank stone-circle hides the grid lines behind the letter
+          svg += this.drawStone(elementX, elementY, palette.goban, palette.goban);
+          svg += this.markIntersection(elementX, elementY, this.radius + LETTER_RADIUS_OFFSET, bkColor, "@");
+          markupColor = palette.black;
+        } else {
+          break; // unknown character — skip
+        }
+        svg += `
+          <text x="${elementX}"
+                y="${elementY}"
+                fill="${markupColor}"
+                class="${markupClass}"
+                text-anchor="middle"
+                dominant-baseline="central"
+                ${markupTextSize}>
+            ${curchar}
+          </text>\n`;
+        break;
+      }
     }
+
+    return { svg, link };
+  }
+
+  private assembleSVG(components: SVGComponents): string {
+    return (
+      components.openSvgTag +
+      components.background +
+      components.svgDiagram +
+      components.links +
+      components.coordinates +
+      components.closeSvgTag
+    );
   }
 
   drawStone(
@@ -827,7 +788,7 @@ export class GoDiagram {
     // Align with grid intersections using the same formula as the main drawing loop
 
     // Offset from left border
-    const leftX = COORDINATE_LEFT_OFFSET + this.fontSize["w"];
+    const leftX = COORDINATE_LEFT_OFFSET + this.fontSize.w;
     // Start at the same Y position as the first grid intersection
     let img_y = this.radius + this.offset_y;
 
@@ -867,10 +828,6 @@ export class GoDiagram {
     }
     return leftColSvgElems + topRowSvgElems;
   }
-
-  //   drawGobanBorder(color, color2, open, white) {
-  //     return "";
-  //   }
 
   createSGF(): string /** Creates SGF based on ASCII diagram and title //FIX ME: STILL TO DO
    * returns SGF as string or FALSE (if board not a square)

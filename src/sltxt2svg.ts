@@ -620,7 +620,7 @@ export class GoDiagram {
           const bkColor = this.linkmap[curchar] != null ? palette.link : palette.goban;
           // Blank stone-circle hides the grid lines behind the letter
           svg += this.drawStone(elementX, elementY, palette.goban, palette.goban);
-          this.markIntersection(elementX, elementY, this.radius + LETTER_RADIUS_OFFSET, bkColor, "@");
+          svg += this.markIntersection(elementX, elementY, this.radius + LETTER_RADIUS_OFFSET, bkColor, "@");
           markupColor = palette.black;
         } else {
           break; // unknown character — skip

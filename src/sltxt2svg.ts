@@ -124,8 +124,6 @@ const IMAGE_OFFSET = 2;
 const IMAGE_BORDER = 4;
 const COORDINATE_LEFT_OFFSET = 6;
 const COORDINATE_TOP_OFFSET = 18;
-const COORDINATE_BOTTOM_OFFSET = 12;
-const Y_OFFSET_ADJUSTMENT = 12.5;
 const MARKUP_TEXT_SIZE_RATIO = 0.9;
 const DEFAULT_TEXT_SIZE_RATIO = 0.5;
 const CIRCLE_INNER_RADIUS_OFFSET = 3;
@@ -133,7 +131,6 @@ const CIRCLE_OUTER_RADIUS_OFFSET = 2;
 const SQUARE_HALF_SIZE = 7;
 const HOSHI_RADIUS = 3;
 const DEFAULT_DIAGRAM_WIDTH = 400;
-const DEFAULT_FONT_SIZE: FontSize = { h: 16, w: 8 };
 const COORDINATE_WIDTH_PADDING = 4;  // extra px added to image width for coordinate labels
 const COORDINATE_HEIGHT_PADDING = 2; // extra px added to image height for coordinate labels
 const LINK_AREA_OPACITY = 0.4;        // transparency of linked areas on the goban
@@ -265,7 +262,7 @@ export class GoDiagram {
       // remove unnecessary chars, replace border chars
       if (!this.diagram) return;
       let diag = this.diagram.replace(/[-|+]/g, "%");
-      diag = diag.replace(/[\t\r\$]/g, "");
+      diag = diag.replace(/[\t\r$]/g, "");
       diag = diag.replace(/\n+/g, " \n");
 
       this.rows = [];
@@ -430,7 +427,7 @@ export class GoDiagram {
     return this.htmlspecialchars(this.title);
   }
 
-  createSvgErrorMessage(errorClass: string): string {
+  createSvgErrorMessage(_errorClass: string): string {
     // Return an svgElement string with the error message
 
     // poor man text wrapping, still unsupported in SVG 1.1
@@ -442,8 +439,8 @@ export class GoDiagram {
     if (splitMessage.length % wPerL !== 0) {
       lines++;
     }
-    const svgError = document.createElementNS(xmlns, "g");
-    const rect = document.createElementNS(xmlns, "rect");
+    const svgError = activeDocument.createElementNS(xmlns, "g");
+    const rect = activeDocument.createElementNS(xmlns, "rect");
     rect.setAttributeNS(null, "x", "0");
     rect.setAttributeNS(null, "y", "0");
     rect.setAttributeNS(null, "rx", "20");
@@ -452,7 +449,7 @@ export class GoDiagram {
     rect.setAttributeNS(null, "fill", "red");
     rect.setAttributeNS(null, "stroke", "black");
     rect.setAttributeNS(null, "class", "errorClass");
-    const text = document.createElementNS(xmlns, "text");
+    const text = activeDocument.createElementNS(xmlns, "text");
     text.setAttributeNS(null, "x", "30");
     text.setAttributeNS(null, "y", "30");
     text.setAttributeNS(null, "font-size", "15");
@@ -460,12 +457,13 @@ export class GoDiagram {
 
     let message = "";
     for (let i = 0; i < lines; i++) {
-      message += splitMessage.slice(i * wPerL, (i + 1) * wPerL) + "\n";
+      message += splitMessage.slice(i * wPerL, (i + 1) * wPerL).join("") + "\n";
     }
+    // eslint-disable-next-line no-unsanitized/property
     text.innerHTML = message;
     svgError.appendChild(rect);
     svgError.appendChild(text);
-    return String(svgError); // TODO: Just to allow compilation.
+    return new XMLSerializer().serializeToString(svgError);
   }
 
   /** Create the SVG image based on ASCII diagram

@@ -3,7 +3,6 @@ import { GoDiagram } from "./sltxt2svg";
 
 export default class ObsidianGoban extends Plugin {
   async onload() {
-    console.log("Loading Obsidian Goban");
     this.registerMarkdownCodeBlockProcessor("goban", this.drawGoban());
   }
 
@@ -23,7 +22,7 @@ export default class ObsidianGoban extends Plugin {
       const xmlns = "http://www.w3.org/2000/svg";
       const boxWidth = svgGoban.width ?? 320;
       const boxHeight = svgGoban.height ?? 320;
-      const block = document.createElementNS(xmlns, "svg");
+      const block = activeDocument.createElementNS(xmlns, "svg");
       block.setAttributeNS(
         null,
         "viewBox",
@@ -31,8 +30,9 @@ export default class ObsidianGoban extends Plugin {
       );
       block.setAttributeNS(null, "width", String(this.roundNumberToTens(boxWidth)));
       block.setAttributeNS(null, "height", String(this.roundNumberToTens(boxHeight)));
+      // eslint-disable-next-line no-unsanitized/property
       block.innerHTML = svgGoban.xml;
-      block.style.display = "block";
+      block.classList.add("goban-block");
       el.appendChild(block);
     };
   }

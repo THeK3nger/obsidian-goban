@@ -136,17 +136,16 @@ const COORDINATE_HEIGHT_PADDING = 2; // extra px added to image height for coord
 const LINK_AREA_OPACITY = 0.4;        // transparency of linked areas on the goban
 const LETTER_RADIUS_OFFSET = 4;      // extra radius when drawing a background behind letters
 const ERROR_WORDS_PER_LINE = 4;      // chunks used for wrapping the error message text
+const SVG_NS = "http://www.w3.org/2000/svg";
 
 type FontSize = { h: number; w: number };
-type SVGResult = { xml: string; width: number | null; height: number | null };
+type SVGResult = { element: SVGSVGElement; width: number | null; height: number | null };
 
 interface SVGComponents {
-  openSvgTag: string;
-  background: string;
-  coordinates: string;
-  svgDiagram: string;
-  links: string;
-  closeSvgTag: string;
+  background: SVGRectElement;
+  coordinates: SVGTextElement[];
+  svgDiagram: SVGElement[];
+  links: SVGElement[];
 }
 
 interface ColorPalette {
@@ -158,11 +157,12 @@ interface ColorPalette {
 }
 
 interface RenderContext {
+  svgDocument: Document;
   palette: ColorPalette;
   evencolor: string;
   oddcolor: string;
   markupClass: string;
-  markupTextSize: string;
+  markupTextSize: number;
 }
 
 export class GoDiagram {
@@ -427,20 +427,17 @@ export class GoDiagram {
     return this.htmlspecialchars(this.title);
   }
 
-  createSvgErrorMessage(_errorClass: string): string {
-    // Return an svgElement string with the error message
-
+  createSvgErrorMessage(svgDocument: Document, errorClass: string): SVGGElement {
+    // Return an svgElement with the error message
     // poor man text wrapping, still unsupported in SVG 1.1
-    const xmlns = "http://www.w3.org/2000/svg";
-
     const splitMessage = this.failureErrorMessage.split(/(.{1,15})/g);
     const wPerL = ERROR_WORDS_PER_LINE;
     let lines = Math.floor(splitMessage.length / wPerL);
     if (splitMessage.length % wPerL !== 0) {
       lines++;
     }
-    const svgError = activeDocument.createElementNS(xmlns, "g");
-    const rect = activeDocument.createElementNS(xmlns, "rect");
+    const svgError = svgDocument.createElementNS(SVG_NS, "g");
+    const rect = svgDocument.createElementNS(SVG_NS, "rect");
     rect.setAttributeNS(null, "x", "0");
     rect.setAttributeNS(null, "y", "0");
     rect.setAttributeNS(null, "rx", "20");
@@ -448,8 +445,8 @@ export class GoDiagram {
     rect.setAttributeNS(null, "height", String(lines * 50));
     rect.setAttributeNS(null, "fill", "red");
     rect.setAttributeNS(null, "stroke", "black");
-    rect.setAttributeNS(null, "class", "errorClass");
-    const text = activeDocument.createElementNS(xmlns, "text");
+    rect.setAttributeNS(null, "class", errorClass);
+    const text = svgDocument.createElementNS(SVG_NS, "text");
     text.setAttributeNS(null, "x", "30");
     text.setAttributeNS(null, "y", "30");
     text.setAttributeNS(null, "font-size", "15");
@@ -459,27 +456,29 @@ export class GoDiagram {
     for (let i = 0; i < lines; i++) {
       message += splitMessage.slice(i * wPerL, (i + 1) * wPerL).join("") + "\n";
     }
-    // eslint-disable-next-line no-unsanitized/property
-    text.innerHTML = message;
+    text.textContent = message;
     svgError.appendChild(rect);
     svgError.appendChild(text);
-    return new XMLSerializer().serializeToString(svgError);
+    return svgError;
   }
 
   /** Create the SVG image based on ASCII diagram
-   *  returns an SVG object (an XML text file), and the svg's width and height.
+   *  returns an SVG object and the svg's width and height.
    **/
-  createSVG(): SVGResult {
+  createSVG(svgDocument: Document = activeDocument): SVGResult {
     if (this.diagram === null) {
       this.failureErrorMessage = "Parsing of ASCII diagram failed";
-      return { xml: this.createSvgErrorMessage("errorClass"), width: null, height: null };
+      const element = this.createSVGRoot(svgDocument, DEFAULT_DIAGRAM_WIDTH, DEFAULT_DIAGRAM_WIDTH);
+      element.appendChild(this.createSvgErrorMessage(svgDocument, "errorClass"));
+      return { element, width: null, height: null };
     }
 
     const palette = this.buildColorPalette();
-    const markupTextSize = `style="font-size:${Math.floor(this.fontSize.h * MARKUP_TEXT_SIZE_RATIO - 1)}px"`;
-    const defaultTextSize = `style="font-size:${this.fontSize.h * DEFAULT_TEXT_SIZE_RATIO}px"`;
+    const markupTextSize = Math.floor(this.fontSize.h * MARKUP_TEXT_SIZE_RATIO - 1);
+    const defaultTextSize = this.fontSize.h * DEFAULT_TEXT_SIZE_RATIO;
 
     const ctx: RenderContext = {
+      svgDocument,
       palette,
       evencolor: this.firstColor === "W" ? palette.black : palette.white,
       oddcolor:  this.firstColor === "W" ? palette.white : palette.black,
@@ -490,21 +489,39 @@ export class GoDiagram {
     const { svgDiagram, links } = this.renderGrid(ctx);
 
     const components: SVGComponents = {
-      openSvgTag: `<svg width="${this.imageWidth}" height="${this.imageHeight}">\n`,
-      closeSvgTag: "</svg>\n",
-      background: this.renderBackground(palette),
+      background: this.renderBackground(svgDocument, palette),
       coordinates: this.coordinates
-        ? this.drawCoordinates(palette.black, "coordClass", defaultTextSize)
-        : "",
+        ? this.drawCoordinates(svgDocument, palette.black, "coordClass", defaultTextSize)
+        : [],
       svgDiagram,
       links,
     };
 
     return {
-      xml: this.assembleSVG(components),
+      element: this.assembleSVG(svgDocument, components),
       width: this.imageWidth,
       height: this.imageHeight,
     };
+  }
+
+  private createSVGRoot(
+    svgDocument: Document,
+    width: number,
+    height: number
+  ): SVGSVGElement {
+    const svg = svgDocument.createElementNS(SVG_NS, "svg");
+    svg.setAttributeNS(null, "width", String(width));
+    svg.setAttributeNS(null, "height", String(height));
+    return svg;
+  }
+
+  private setSvgAttributes(
+    element: SVGElement,
+    attributes: Record<string, string | number>
+  ): void {
+    for (const key in attributes) {
+      element.setAttributeNS(null, key, String(attributes[key]));
+    }
   }
 
   private buildColorPalette(): ColorPalette {
@@ -517,13 +534,21 @@ export class GoDiagram {
     };
   }
 
-  private renderBackground(palette: ColorPalette): string {
-    return `<rect x="0" y="0" width="${this.imageWidth}" height="${this.imageHeight}" fill="${palette.goban}"/>\n`;
+  private renderBackground(svgDocument: Document, palette: ColorPalette): SVGRectElement {
+    const rect = svgDocument.createElementNS(SVG_NS, "rect");
+    this.setSvgAttributes(rect, {
+      x: 0,
+      y: 0,
+      width: this.imageWidth,
+      height: this.imageHeight,
+      fill: palette.goban,
+    });
+    return rect;
   }
 
-  private renderGrid(ctx: RenderContext): { svgDiagram: string; links: string } {
-    let svgDiagram = "";
-    let links = "";
+  private renderGrid(ctx: RenderContext): { svgDiagram: SVGElement[]; links: SVGElement[] } {
+    const svgDiagram: SVGElement[] = [];
+    const links: SVGElement[] = [];
 
     for (let ypos = this.startrow; ypos <= this.endrow; ypos++) {
       const elementY =
@@ -532,8 +557,10 @@ export class GoDiagram {
         const elementX =
           (xpos - this.startcol) * (this.radius * 2) + this.radius + this.offset_x;
         const { svg, link } = this.renderCell(xpos, ypos, elementX, elementY, ctx);
-        svgDiagram += svg;
-        links += link;
+        svgDiagram.push(...svg);
+        if (link !== null) {
+          links.push(link);
+        }
       }
     }
 
@@ -546,10 +573,10 @@ export class GoDiagram {
     elementX: number,
     elementY: number,
     ctx: RenderContext
-  ): { svg: string; link: string } {
-    const { palette, evencolor, oddcolor, markupClass, markupTextSize } = ctx;
-    let svg = "";
-    let link = "";
+  ): { svg: SVGElement[]; link: SVGElement | null } {
+    const { svgDocument, palette, evencolor, oddcolor, markupClass, markupTextSize } = ctx;
+    const svg: SVGElement[] = [];
+    let link: SVGElement | null = null;
     let markupColor = "";
     let curchar = this.rows[ypos][xpos];
 
@@ -557,13 +584,19 @@ export class GoDiagram {
     // (SVG 2.0 href, see https://www.w3.org/TR/SVG2/linking.html#URLReference)
     const linkUrl = this.linkmap[curchar];
     if (linkUrl) {
-      link = `
-        <a href="${linkUrl}">
-          <rect x="${elementX - this.radius}" y="${elementY - this.radius}"
-                width="${this.radius * 2}" height="${this.radius * 2}"
-                stroke="${palette.goban}" fill="${palette.link}" fill-opacity="${LINK_AREA_OPACITY}" />
-        </a>
-      `;
+      link = svgDocument.createElementNS(SVG_NS, "a");
+      link.setAttributeNS(null, "href", linkUrl);
+      const rect = svgDocument.createElementNS(SVG_NS, "rect");
+      this.setSvgAttributes(rect, {
+        x: elementX - this.radius,
+        y: elementY - this.radius,
+        width: this.radius * 2,
+        height: this.radius * 2,
+        stroke: palette.goban,
+        fill: palette.link,
+        "fill-opacity": LINK_AREA_OPACITY,
+      });
+      link.appendChild(rect);
     }
 
     switch (curchar) {
@@ -571,9 +604,9 @@ export class GoDiagram {
       case "X":
       case "B":
       case "#":
-        svg += this.drawStone(elementX, elementY, palette.black, palette.black);
+        svg.push(this.drawStone(svgDocument, elementX, elementY, palette.black, palette.black));
         if (curchar !== "X") {
-          svg += this.markIntersection(elementX, elementY, this.radius, palette.red, curchar);
+          svg.push(...this.markIntersection(svgDocument, elementX, elementY, this.radius, palette.red, curchar));
         }
         break;
 
@@ -581,9 +614,9 @@ export class GoDiagram {
       case "O":
       case "W":
       case "@":
-        svg += this.drawStone(elementX, elementY, palette.black, palette.white);
+        svg.push(this.drawStone(svgDocument, elementX, elementY, palette.black, palette.white));
         if (curchar !== "O") {
-          svg += this.markIntersection(elementX, elementY, this.radius, palette.red, curchar);
+          svg.push(...this.markIntersection(svgDocument, elementX, elementY, this.radius, palette.red, curchar));
         }
         break;
 
@@ -593,10 +626,10 @@ export class GoDiagram {
       case "C":
       case "S": {
         const type = this.getIntersectionType(xpos, ypos);
-        svg += this.drawIntersection(elementX, elementY, palette.black, type);
+        svg.push(...this.drawIntersection(svgDocument, elementX, elementY, palette.black, type));
         if (curchar !== ".") {
           const col = curchar === "," ? palette.black : palette.red;
-          svg += this.markIntersection(elementX, elementY, this.radius, col, curchar);
+          svg.push(...this.markIntersection(svgDocument, elementX, elementY, this.radius, col, curchar));
         }
         break;
       }
@@ -605,34 +638,36 @@ export class GoDiagram {
       default: {
         if (parseInt(curchar) % 2 === 1) {
           // odd-numbered move
-          svg += this.drawStone(elementX, elementY, palette.black, oddcolor);
+          svg.push(this.drawStone(svgDocument, elementX, elementY, palette.black, oddcolor));
           markupColor = evencolor;
         } else if (parseInt(curchar) % 2 === 0 || parseInt(curchar) === 0) {
           // even-numbered move (0 is displayed as "10")
-          svg += this.drawStone(elementX, elementY, palette.black, evencolor);
+          svg.push(this.drawStone(svgDocument, elementX, elementY, palette.black, evencolor));
           markupColor = oddcolor;
           if (curchar === "0") curchar = "10";
         } else if (curchar >= "a" && curchar <= "z") {
           const intersectionType = this.getIntersectionType(xpos, ypos);
-          svg += this.drawIntersection(elementX, elementY, palette.black, intersectionType);
+          svg.push(...this.drawIntersection(svgDocument, elementX, elementY, palette.black, intersectionType));
           const bkColor = this.linkmap[curchar] != null ? palette.link : palette.goban;
           // Blank stone-circle hides the grid lines behind the letter
-          svg += this.drawStone(elementX, elementY, palette.goban, palette.goban);
-          svg += this.markIntersection(elementX, elementY, this.radius + LETTER_RADIUS_OFFSET, bkColor, "@");
+          svg.push(this.drawStone(svgDocument, elementX, elementY, palette.goban, palette.goban));
+          svg.push(...this.markIntersection(svgDocument, elementX, elementY, this.radius + LETTER_RADIUS_OFFSET, bkColor, "@"));
           markupColor = palette.black;
         } else {
           break; // unknown character — skip
         }
-        svg += `
-          <text x="${elementX}"
-                y="${elementY}"
-                fill="${markupColor}"
-                class="${markupClass}"
-                text-anchor="middle"
-                dominant-baseline="central"
-                ${markupTextSize}>
-            ${curchar}
-          </text>\n`;
+        const text = svgDocument.createElementNS(SVG_NS, "text");
+        this.setSvgAttributes(text, {
+          x: elementX,
+          y: elementY,
+          fill: markupColor,
+          class: markupClass,
+          "text-anchor": "middle",
+          "dominant-baseline": "central",
+          style: `font-size:${markupTextSize}px`,
+        });
+        text.textContent = curchar;
+        svg.push(text);
         break;
       }
     }
@@ -640,18 +675,17 @@ export class GoDiagram {
     return { svg, link };
   }
 
-  private assembleSVG(components: SVGComponents): string {
-    return (
-      components.openSvgTag +
-      components.background +
-      components.svgDiagram +
-      components.links +
-      components.coordinates +
-      components.closeSvgTag
-    );
+  private assembleSVG(svgDocument: Document, components: SVGComponents): SVGSVGElement {
+    const svg = this.createSVGRoot(svgDocument, this.imageWidth, this.imageHeight);
+    svg.appendChild(components.background);
+    components.svgDiagram.forEach((element) => svg.appendChild(element));
+    components.links.forEach((element) => svg.appendChild(element));
+    components.coordinates.forEach((element) => svg.appendChild(element));
+    return svg;
   }
 
   drawStone(
+    svgDocument: Document,
     x: number,
     y: number,
     colorRing: string,
@@ -660,12 +694,20 @@ export class GoDiagram {
      * x and y are the coords of the center of the diagram's cell
      * colorRing, colorInside are stone colors (edge and body, resp.)
      **/
-  ): string {
-    return `<circle cx="${x}" cy="${y}" r="${this.radius - 1}" stroke="${colorRing}" fill="${colorInside}" />
-  `;
+  ): SVGCircleElement {
+    const circle = svgDocument.createElementNS(SVG_NS, "circle");
+    this.setSvgAttributes(circle, {
+      cx: x,
+      cy: y,
+      r: this.radius - 1,
+      stroke: colorRing,
+      fill: colorInside,
+    });
+    return circle;
   }
 
   markIntersection(
+    svgDocument: Document,
     x: number,
     y: number,
     radius: number,
@@ -675,38 +717,54 @@ export class GoDiagram {
      * x and y are the coords of the center of the diagram's cell
      * type is one of W,B,C for circle or S,@,# for square
      **/
-  ): string {
-    let intersectionElements = "";
+  ): SVGElement[] {
+    const intersectionElements: SVGElement[] = [];
     switch (type) {
       case "W":
       case "B":
       case "C":
-        intersectionElements +=
-          `<circle cx="${x}" cy="${y}" r="${
-            radius - CIRCLE_INNER_RADIUS_OFFSET
-          }" stroke="${color}" fill="none" />\n` +
-          `<circle cx="${x}" cy="${y}" r="${
-            radius - CIRCLE_OUTER_RADIUS_OFFSET
-          }" stroke="${color}" fill="none" />\n`;
+        [CIRCLE_INNER_RADIUS_OFFSET, CIRCLE_OUTER_RADIUS_OFFSET].forEach((offset) => {
+          const circle = svgDocument.createElementNS(SVG_NS, "circle");
+          this.setSvgAttributes(circle, {
+            cx: x,
+            cy: y,
+            r: radius - offset,
+            stroke: color,
+            fill: "none",
+          });
+          intersectionElements.push(circle);
+        });
         break;
 
       case "S":
       case "@":
       case "#":
-        intersectionElements += `
-          <rect x="${x - radius / 2 + 1}"
-            y="${y - radius / 2 + 1}"
-            width="${SQUARE_HALF_SIZE}"
-            height="${SQUARE_HALF_SIZE}"
-            stroke="${color}"
-            fill="none" />
-        `;
+        {
+          const rect = svgDocument.createElementNS(SVG_NS, "rect");
+          this.setSvgAttributes(rect, {
+            x: x - radius / 2 + 1,
+            y: y - radius / 2 + 1,
+            width: SQUARE_HALF_SIZE,
+            height: SQUARE_HALF_SIZE,
+            stroke: color,
+            fill: "none",
+          });
+          intersectionElements.push(rect);
+        }
         break;
 
       case ",":
-        intersectionElements += `
-          <circle cx="${x}" cy="${y}" r="${HOSHI_RADIUS}" stroke="${color}" fill="${color}" />
-        `;
+        {
+          const circle = svgDocument.createElementNS(SVG_NS, "circle");
+          this.setSvgAttributes(circle, {
+            cx: x,
+            cy: y,
+            r: HOSHI_RADIUS,
+            stroke: color,
+            fill: color,
+          });
+          intersectionElements.push(circle);
+        }
     }
     return intersectionElements;
   }
@@ -736,6 +794,7 @@ export class GoDiagram {
   }
 
   drawIntersection(
+    svgDocument: Document,
     x: number,
     y: number,
     color: string,
@@ -744,31 +803,37 @@ export class GoDiagram {
      * type can be 'U', 'L', 'R', 'B', 'UL', 'BL', 'UR', 'BR'
      * an empty type represents a middle (non-edge) intersection.
      **/
-  ): string {
-    let intersectionElements = "";
+  ): SVGLineElement[] {
+    const intersectionElements: SVGLineElement[] = [];
+    const drawLine = (x1: number, y1: number, x2: number, y2: number) => {
+      const line = svgDocument.createElementNS(SVG_NS, "line");
+      this.setSvgAttributes(line, { x1, y1, x2, y2, stroke: color });
+      intersectionElements.push(line);
+    };
+
     if (!type.includes("U")) {
-      intersectionElements += `<line x1="${x}" y1="${y - this.radius}" x2="${x}" y2="${y}" stroke="${color}" />\n`;
+      drawLine(x, y - this.radius, x, y);
     }
     if (!type.includes("B")) {
-      intersectionElements += `<line x1="${x}" y1="${y + this.radius}" x2="${x}" y2="${y}" stroke="${color}" />\n`;
+      drawLine(x, y + this.radius, x, y);
     }
     if (!type.includes("L")) {
-      intersectionElements += `<line x1="${x - this.radius}" y1="${y}" x2="${x}" y2="${y}" stroke="${color}" />\n`;
+      drawLine(x - this.radius, y, x, y);
     }
     if (!type.includes("R")) {
-      intersectionElements += `<line x1="${x + this.radius}" y1="${y}" x2="${x}" y2="${y}" stroke="${color}" />\n`;
+      drawLine(x + this.radius, y, x, y);
     }
     return intersectionElements;
   }
 
   drawCoordinates(
+    svgDocument: Document,
     color: string,
     coordClass: string,
-    SVGTextSize: string // Returns one or more svg elements with the Goban coordinates
-  ): string {
+    SVGTextSize: number // Returns one or more svg elements with the Goban coordinates
+  ): SVGTextElement[] {
     const coordChars = "ABCDEFGHJKLMNOPQRSTUVWXYZabcdefghjklmnopqrstuvwxyz123456789";
-    let topRowSvgElems = "";
-    let leftColSvgElems = "";
+    const coordinates: SVGTextElement[] = [];
 
     let coordY = this.bottomborder
       ? this.endrow - this.startrow + 1
@@ -791,16 +856,9 @@ export class GoDiagram {
     let img_y = this.radius + this.offset_y;
 
     for (let y = 0; y <= this.endrow - this.startrow; y++) {
-      leftColSvgElems += `
-      <text x="${leftX}"
-          y="${img_y}"
-          class="${coordClass}"
-          ${SVGTextSize}
-          color="${color}"
-          text-anchor="middle"
-          dominant-baseline="central">
-        ${coordY.toString()}
-      </text>\n`;
+      coordinates.push(
+        this.createTextElement(svgDocument, leftX, img_y, coordY.toString(), coordClass, SVGTextSize, color)
+      );
       img_y += this.radius * 2;
       coordY--;
     }
@@ -811,20 +869,36 @@ export class GoDiagram {
     let img_x = this.radius + this.offset_x;
 
     for (let x = 0; x <= this.endcol - this.startcol; x++) {
-      topRowSvgElems += `
-    <text x="${img_x}"
-        y="${topY}"
-        class="${coordClass}"
-        ${SVGTextSize}
-        color="${color}"
-        text-anchor="middle"
-        dominant-baseline="central">
-      ${coordChars[coordX]}
-    </text>\n`;
+      coordinates.push(
+        this.createTextElement(svgDocument, img_x, topY, coordChars[coordX], coordClass, SVGTextSize, color)
+      );
       img_x += this.radius * 2;
       coordX++;
     }
-    return leftColSvgElems + topRowSvgElems;
+    return coordinates;
+  }
+
+  private createTextElement(
+    svgDocument: Document,
+    x: number,
+    y: number,
+    value: string,
+    cssClass: string,
+    fontSize: number,
+    color: string
+  ): SVGTextElement {
+    const text = svgDocument.createElementNS(SVG_NS, "text");
+    this.setSvgAttributes(text, {
+      x,
+      y,
+      class: cssClass,
+      style: `font-size:${fontSize}px`,
+      color,
+      "text-anchor": "middle",
+      "dominant-baseline": "central",
+    });
+    text.textContent = value;
+    return text;
   }
 
   createSGF(): string /** Creates SGF based on ASCII diagram and title //FIX ME: STILL TO DO

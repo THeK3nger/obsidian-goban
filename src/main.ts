@@ -17,12 +17,11 @@ export default class ObsidianGoban extends Plugin {
       _ctx: MarkdownPostProcessorContext
     ) => {
       const goban = new GoDiagram(source);
-      const svgGoban = goban.createSVG();
+      const svgGoban = goban.createSVG(activeDocument);
 
-      const xmlns = "http://www.w3.org/2000/svg";
       const boxWidth = svgGoban.width ?? 320;
       const boxHeight = svgGoban.height ?? 320;
-      const block = activeDocument.createElementNS(xmlns, "svg");
+      const block = svgGoban.element;
       block.setAttributeNS(
         null,
         "viewBox",
@@ -30,8 +29,6 @@ export default class ObsidianGoban extends Plugin {
       );
       block.setAttributeNS(null, "width", String(this.roundNumberToTens(boxWidth)));
       block.setAttributeNS(null, "height", String(this.roundNumberToTens(boxHeight)));
-      // eslint-disable-next-line no-unsanitized/property
-      block.innerHTML = svgGoban.xml;
       block.classList.add("goban-block");
       el.appendChild(block);
     };

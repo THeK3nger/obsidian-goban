@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.3.0 (2026-05-14)
+
+### Improved
+
+I completely refactored the plugin to make it compliant with the new Obsidian Community guidelines.
+
 ## v0.2.0 (2023-09-05)
 
 - feat: add the ability to use numbers >10 for move numbers (thanks @RobertChrist)

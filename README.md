@@ -51,12 +51,11 @@ $$ [a|http://gtl.xmp.net/members/info?p_key=349&pseudo=dada]
 $$ [C|#1]
 ```
 ````
+You should get something like this:
+
+<img width="447" height="502" alt="CleanShot 2026-05-14 at 19 01 59@2x" src="https://github.com/user-attachments/assets/2e643e00-cdba-411e-9001-bba822596c61" />
 
 For the full diagram syntax, see [How Diagrams Work on Sensei's Library](https://senseis.xmp.net/?HowDiagramsWork).
-
-## Example
-
-![Example goban diagram](example.png)
 
 ## Limitations
 

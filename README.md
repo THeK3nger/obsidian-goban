@@ -1,4 +1,4 @@
-# Obsidian Goban Plugin
+# Goban Viewer
 
 This plugin adds the capability to visualize Go/Baduk diagrams written in the [Sensei's Library](https://senseis.xmp.net/?HowDiagramsWork) format.
 

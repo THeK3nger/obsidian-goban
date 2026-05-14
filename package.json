@@ -8,12 +8,12 @@
   "scripts": {
     "dev": "rollup --config rollup.config.js -w",
     "build": "tsc --noEmit -skipLibCheck && rollup --config rollup.config.js",
-    "version": "node version-bump.mjs && git add manifest.json versions.json"
+    "version": "node version-bump.mjs"
   },
   "keywords": [
     "obsidian-md"
   ],
-  "license": "MIT",
+  "license": "GPL-3.0-only",
   "devDependencies": {
     "@rollup/plugin-commonjs": "^29.0.2",
     "@rollup/plugin-node-resolve": "^16.0.3",

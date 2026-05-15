@@ -1,10 +1,10 @@
 {
-  "id": "goban-viewer",
-  "name": "Goban Viewer",
-  "version": "0.3.0",
-  "minAppVersion": "1.0.0",
-  "description": "Render Go/Baduk positions diagrams in note preview.",
-  "author": "Davide Aversa",
-  "authorUrl": "https://www.davideaversa.it",
-  "isDesktopOnly": false
+	"id": "goban-viewer",
+	"name": "Goban Viewer",
+	"version": "0.3.1",
+	"minAppVersion": "1.0.0",
+	"description": "Render Go/Baduk positions diagrams in note preview.",
+	"author": "Davide Aversa",
+	"authorUrl": "https://www.davideaversa.it",
+	"isDesktopOnly": false
 }

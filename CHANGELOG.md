@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.3.1
+
+### Improved
+
+- Improved the output of the rendering project by:
+    - Better highlight/links
+    - The text is more balanced inside the stones.
+    - Slightly larger font
+
+
 ## v0.3.0 (2026-05-14)
 
 ### Improved

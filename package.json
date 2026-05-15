@@ -1,7 +1,7 @@
 {
   "name": "obsidian-goban",
   "author": "Davide Aversa <thek3nger@gmail.com>",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Rendering engine for Go/Baduk positions in Obsidian",
   "main": "main.js",
   "type": "module",

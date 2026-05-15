@@ -133,7 +133,8 @@ const HOSHI_RADIUS = 3;
 const DEFAULT_DIAGRAM_WIDTH = 400;
 const COORDINATE_WIDTH_PADDING = 4;  // extra px added to image width for coordinate labels
 const COORDINATE_HEIGHT_PADDING = 2; // extra px added to image height for coordinate labels
-const LINK_AREA_OPACITY = 0.4;        // transparency of linked areas on the goban
+const LINK_HIGHLIGHT_OPACITY = 0.28;  // transparency of linked intersections on the goban
+const LINK_HIGHLIGHT_STROKE_OPACITY = 0.85;
 const LETTER_RADIUS_OFFSET = 4;      // extra radius when drawing a background behind letters
 const ERROR_WORDS_PER_LINE = 4;      // chunks used for wrapping the error message text
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -145,7 +146,6 @@ interface SVGComponents {
   background: SVGRectElement;
   coordinates: SVGTextElement[];
   svgDiagram: SVGElement[];
-  links: SVGElement[];
 }
 
 interface ColorPalette {
@@ -486,7 +486,7 @@ export class GoDiagram {
       markupTextSize,
     };
 
-    const { svgDiagram, links } = this.renderGrid(ctx);
+    const svgDiagram = this.renderGrid(ctx);
 
     const components: SVGComponents = {
       background: this.renderBackground(svgDocument, palette),
@@ -494,7 +494,6 @@ export class GoDiagram {
         ? this.drawCoordinates(svgDocument, palette.black, "coordClass", defaultTextSize)
         : [],
       svgDiagram,
-      links,
     };
 
     return {
@@ -546,9 +545,8 @@ export class GoDiagram {
     return rect;
   }
 
-  private renderGrid(ctx: RenderContext): { svgDiagram: SVGElement[]; links: SVGElement[] } {
+  private renderGrid(ctx: RenderContext): SVGElement[] {
     const svgDiagram: SVGElement[] = [];
-    const links: SVGElement[] = [];
 
     for (let ypos = this.startrow; ypos <= this.endrow; ypos++) {
       const elementY =
@@ -556,15 +554,12 @@ export class GoDiagram {
       for (let xpos = this.startcol; xpos <= this.endcol; xpos++) {
         const elementX =
           (xpos - this.startcol) * (this.radius * 2) + this.radius + this.offset_x;
-        const { svg, link } = this.renderCell(xpos, ypos, elementX, elementY, ctx);
+        const svg = this.renderCell(xpos, ypos, elementX, elementY, ctx);
         svgDiagram.push(...svg);
-        if (link !== null) {
-          links.push(link);
-        }
       }
     }
 
-    return { svgDiagram, links };
+    return svgDiagram;
   }
 
   private renderCell(
@@ -573,31 +568,14 @@ export class GoDiagram {
     elementX: number,
     elementY: number,
     ctx: RenderContext
-  ): { svg: SVGElement[]; link: SVGElement | null } {
+  ): SVGElement[] {
     const { svgDocument, palette, evencolor, oddcolor, markupClass, markupTextSize } = ctx;
     const svg: SVGElement[] = [];
-    let link: SVGElement | null = null;
     let markupColor = "";
     let curchar = this.rows[ypos][xpos];
 
-    // If this cell has a link, overlay a translucent highlight and wrap in <a>
-    // (SVG 2.0 href, see https://www.w3.org/TR/SVG2/linking.html#URLReference)
+    // SVG 2.0 href, see https://www.w3.org/TR/SVG2/linking.html#URLReference
     const linkUrl = this.linkmap[curchar];
-    if (linkUrl) {
-      link = svgDocument.createElementNS(SVG_NS, "a");
-      link.setAttributeNS(null, "href", linkUrl);
-      const rect = svgDocument.createElementNS(SVG_NS, "rect");
-      this.setSvgAttributes(rect, {
-        x: elementX - this.radius,
-        y: elementY - this.radius,
-        width: this.radius * 2,
-        height: this.radius * 2,
-        stroke: palette.goban,
-        fill: palette.link,
-        "fill-opacity": LINK_AREA_OPACITY,
-      });
-      link.appendChild(rect);
-    }
 
     switch (curchar) {
       // Black stone — plain (X) or with circle (B) or square (#)
@@ -648,40 +626,69 @@ export class GoDiagram {
         } else if (curchar >= "a" && curchar <= "z") {
           const intersectionType = this.getIntersectionType(xpos, ypos);
           svg.push(...this.drawIntersection(svgDocument, elementX, elementY, palette.black, intersectionType));
-          const bkColor = this.linkmap[curchar] != null ? palette.link : palette.goban;
           // Blank stone-circle hides the grid lines behind the letter
           svg.push(this.drawStone(svgDocument, elementX, elementY, palette.goban, palette.goban));
-          svg.push(...this.markIntersection(svgDocument, elementX, elementY, this.radius + LETTER_RADIUS_OFFSET, bkColor, "@"));
+          svg.push(...this.markIntersection(svgDocument, elementX, elementY, this.radius + LETTER_RADIUS_OFFSET, palette.goban, "@"));
           markupColor = palette.black;
         } else {
           break; // unknown character — skip
         }
-        const text = svgDocument.createElementNS(SVG_NS, "text");
-        this.setSvgAttributes(text, {
-          x: elementX,
-          y: elementY,
-          fill: markupColor,
-          class: markupClass,
-          "text-anchor": "middle",
-          "dominant-baseline": "central",
-          style: `font-size:${markupTextSize}px`,
-        });
-        text.textContent = curchar;
-        svg.push(text);
+        svg.push(this.createTextElement(svgDocument, elementX, elementY, curchar, markupClass, markupTextSize, markupColor));
         break;
       }
     }
 
-    return { svg, link };
+    if (!linkUrl) {
+      return svg;
+    }
+
+    const link = svgDocument.createElementNS(SVG_NS, "a");
+    link.setAttributeNS(null, "href", linkUrl);
+    link.setAttributeNS(null, "style", "text-decoration:none");
+    link.appendChild(this.drawLinkHighlight(svgDocument, elementX, elementY, palette));
+    svg.forEach((element) => link.appendChild(element));
+    link.appendChild(this.drawLinkHitArea(svgDocument, elementX, elementY));
+    return [link];
   }
 
   private assembleSVG(svgDocument: Document, components: SVGComponents): SVGSVGElement {
     const svg = this.createSVGRoot(svgDocument, this.imageWidth, this.imageHeight);
     svg.appendChild(components.background);
     components.svgDiagram.forEach((element) => svg.appendChild(element));
-    components.links.forEach((element) => svg.appendChild(element));
     components.coordinates.forEach((element) => svg.appendChild(element));
     return svg;
+  }
+
+  private drawLinkHighlight(
+    svgDocument: Document,
+    x: number,
+    y: number,
+    palette: ColorPalette
+  ): SVGCircleElement {
+    const circle = svgDocument.createElementNS(SVG_NS, "circle");
+    this.setSvgAttributes(circle, {
+      cx: x,
+      cy: y,
+      r: this.radius + 2,
+      stroke: palette.link,
+      "stroke-width": 2,
+      "stroke-opacity": LINK_HIGHLIGHT_STROKE_OPACITY,
+      fill: palette.link,
+      "fill-opacity": LINK_HIGHLIGHT_OPACITY,
+    });
+    return circle;
+  }
+
+  private drawLinkHitArea(svgDocument: Document, x: number, y: number): SVGRectElement {
+    const rect = svgDocument.createElementNS(SVG_NS, "rect");
+    this.setSvgAttributes(rect, {
+      x: x - this.radius,
+      y: y - this.radius,
+      width: this.radius * 2,
+      height: this.radius * 2,
+      fill: "transparent",
+    });
+    return rect;
   }
 
   drawStone(
@@ -891,11 +898,13 @@ export class GoDiagram {
     this.setSvgAttributes(text, {
       x,
       y,
+      dy: "0.14em",
+      fill: color,
       class: cssClass,
-      style: `font-size:${fontSize}px`,
-      color,
+      style: `font-size:${fontSize}px;font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-weight:400;line-height:1`,
       "text-anchor": "middle",
-      "dominant-baseline": "central",
+      "dominant-baseline": "middle",
+      "alignment-baseline": "middle",
     });
     text.textContent = value;
     return text;

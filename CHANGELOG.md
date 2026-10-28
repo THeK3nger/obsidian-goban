@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Maintenance
+
+- Updated development dependencies and refreshed the npm lockfile, including the latest Obsidian API types.
+
 ## v0.3.1
 
 ### Improved

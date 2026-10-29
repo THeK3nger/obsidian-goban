@@ -1,3 +1,8 @@
 .goban-block {
     display: block;
 }
+
+.goban-error {
+    color: var(--text-error);
+    white-space: pre-wrap;
+}

@@ -1,4 +1,4 @@
-import { MarkdownPostProcessorContext, Plugin } from "obsidian";
+import { Plugin } from "obsidian";
 import { GoDiagram } from "./sltxt2svg";
 
 export default class ObsidianGoban extends Plugin {
@@ -6,31 +6,28 @@ export default class ObsidianGoban extends Plugin {
     this.registerMarkdownCodeBlockProcessor("goban", this.drawGoban());
   }
 
-  refreshMarkdownCodeBlockProcessor() {
-    this.registerMarkdownCodeBlockProcessor("goban", this.drawGoban());
-  }
-
   private drawGoban() {
-    return (
-      source: string,
-      el: HTMLElement,
-      _ctx: MarkdownPostProcessorContext
-    ) => {
-      const goban = new GoDiagram(source);
-      const svgGoban = goban.createSVG(activeDocument);
+    return (source: string, el: HTMLElement) => {
+      try {
+        const goban = new GoDiagram(source);
+        const svgGoban = goban.createSVG(activeDocument);
 
-      const boxWidth = svgGoban.width ?? 320;
-      const boxHeight = svgGoban.height ?? 320;
-      const block = svgGoban.element;
-      block.setAttributeNS(
-        null,
-        "viewBox",
-        "0 0 " + boxWidth + " " + boxHeight
-      );
-      block.setAttributeNS(null, "width", String(this.roundNumberToTens(boxWidth)));
-      block.setAttributeNS(null, "height", String(this.roundNumberToTens(boxHeight)));
-      block.classList.add("goban-block");
-      el.appendChild(block);
+        const boxWidth = svgGoban.width ?? 320;
+        const boxHeight = svgGoban.height ?? 320;
+        const block = svgGoban.element;
+        block.setAttributeNS(
+          null,
+          "viewBox",
+          "0 0 " + boxWidth + " " + boxHeight
+        );
+        block.setAttributeNS(null, "width", String(this.roundNumberToTens(boxWidth)));
+        block.setAttributeNS(null, "height", String(this.roundNumberToTens(boxHeight)));
+        block.classList.add("goban-block");
+        el.appendChild(block);
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        el.createEl("pre", { cls: "goban-error", text: `Goban: ${message}` });
+      }
     };
   }
 
